@@ -34,7 +34,9 @@
 - [x] Migración V4: columna `telegram_group_invite_link` en `on_call_groups`.
 - [x] Al configurar bot + chat ID en un grupo, se genera automáticamente un enlace de invitación (`createChatInviteLink`) y se guarda en BD.
 - [x] El enlace de invitación se expone en `GET /api/v1/on-call-groups/{id}` como `telegramGroupInviteLink`.
-- [ ] Tests unitarios e integración de los nuevos componentes Telegram.
+- [x] Tests unitarios: `TelegramBotServiceImplTest` (24 tests), `CommandRouterTest` (9 tests), `InfoCommandTest` (3 tests), `ScheduleCommandTest` (4 tests).
+- [x] Tests de integración: `TelegramControllerIntegrationTest` (7 tests) con Testcontainers.
+- [x] Total: **122 tests, 0 fallos**.
 
 ## Completado
 
