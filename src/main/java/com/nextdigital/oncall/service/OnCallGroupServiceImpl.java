@@ -59,6 +59,7 @@ public class OnCallGroupServiceImpl implements OnCallGroupService {
 
         if (Boolean.TRUE.equals(saved.getTelegramBotEnabled())) {
             telegramBotService.registerGroupBot(saved.getId());
+            telegramBotService.generateGroupInviteLink(saved.getId());
         }
 
         return OnCallGroupMapper.toResponse(saved);
@@ -78,6 +79,7 @@ public class OnCallGroupServiceImpl implements OnCallGroupService {
         boolean nowEnabled = Boolean.TRUE.equals(saved.getTelegramBotEnabled());
         if (nowEnabled && !wasEnabled) {
             telegramBotService.registerGroupBot(saved.getId());
+            telegramBotService.generateGroupInviteLink(saved.getId());
         } else if (!nowEnabled && wasEnabled) {
             telegramBotService.unregisterGroupBot(saved.getId());
         }

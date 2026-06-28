@@ -8,12 +8,14 @@ import org.springframework.web.client.RestClient;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * Low-level HTTP client for the Telegram Bot API.
- * Uses Spring's RestClient to communicate with {@code https://api.telegram.org/bot<token>/<method>}.
+ * Uses Spring's RestClient to communicate with
+ * {@code https://api.telegram.org/bot<token>/<method>}.
  * No external Telegram library is needed.
  */
 @Slf4j
@@ -159,13 +161,74 @@ public class TelegramApiClient {
         }
     }
 
+    /**
+     * Creates a chat invite link for a Telegram group.
+     * The bot must be an administrator in the group with "invite users" permission.
+     *
+     * @param botToken the bot token
+     * @param chatId   the group chat ID
+     * @return the invite link (e.g. "https://t.me/+AbCdEf1234"), or null if failed
+     */
+    public String createChatInviteLink(String botToken, String chatId) {
+        try {
+            var response = restClient.post()
+                    .uri("/bot{token}/createChatInviteLink?chat_id={chatId}",
+                            botToken, chatId)
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            if (response != null && response.has("ok") && response.get("ok").asBoolean()) {
+                var link = response.get("result").get("invite_link").asText();
+                log.info("Chat invite link created for chat {}: {}", chatId, link);
+                return link;
+            }
+
+            log.warn("Failed to create invite link for chat {}: {}",
+                    chatId, response != null ? response.toString() : "no response");
+            return null;
+        } catch (Exception e) {
+            log.warn("Could not create invite link for chat {}: {} (bot may need admin rights)",
+                    chatId, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Verifies that a bot can interact with a Telegram chat by sending a chat
+     * action.
+     *
+     * @param botToken the bot token
+     * @param chatId   the chat ID to verify
+     * @return true if the bot can interact with the chat
+     */
+    public boolean verifyBotInGroup(String botToken, String chatId) {
+        try {
+            var response = restClient.post()
+                    .uri("/bot{token}/sendChatAction?chat_id={chatId}&action=typing",
+                            botToken, chatId)
+                    .retrieve()
+                    .body(TelegramResponse.class);
+
+            if (response != null && response.ok()) {
+                log.debug("Bot verified in chat {}", chatId);
+                return true;
+            }
+
+            log.warn("Bot not verified in chat {}: {}", chatId,
+                    response != null ? response.description() : "no response");
+            return false;
+        } catch (Exception e) {
+            log.warn("Bot not in chat {}: {}", chatId, e.getMessage());
+            return false;
+        }
+    }
+
     // ========== Internal DTOs for Telegram API ==========
 
     private record SendMessagePayload(
             @JsonProperty("chat_id") String chatId,
             String text,
-            @JsonProperty("parse_mode") String parseMode
-    ) {
+            @JsonProperty("parse_mode") String parseMode) {
         SendMessagePayload(String chatId, String text, String parseMode) {
             this.chatId = chatId;
             this.text = text;
@@ -176,22 +239,19 @@ public class TelegramApiClient {
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record TelegramResponse(
             boolean ok,
-            String description
-    ) {
+            String description) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record TelegramUpdateResponse(
             boolean ok,
-            List<TelegramUpdate> result
-    ) {
+            List<TelegramUpdate> result) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record TelegramUpdate(
             @JsonProperty("update_id") long updateId,
-            TelegramMessage message
-    ) {
+            TelegramMessage message) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -200,8 +260,7 @@ public class TelegramApiClient {
             TelegramChat chat,
             TelegramFrom from,
             String text,
-            TelegramEntity[] entities
-    ) {
+            TelegramEntity[] entities) {
         public boolean isCommand() {
             if (entities != null) {
                 for (var entity : entities) {
@@ -220,8 +279,7 @@ public class TelegramApiClient {
             String type,
             @JsonProperty("first_name") String firstName,
             @JsonProperty("last_name") String lastName,
-            String username
-    ) {
+            String username) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -231,15 +289,13 @@ public class TelegramApiClient {
             @JsonProperty("first_name") String firstName,
             @JsonProperty("last_name") String lastName,
             String username,
-            @JsonProperty("language_code") String languageCode
-    ) {
+            @JsonProperty("language_code") String languageCode) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record TelegramEntity(
             long offset,
             long length,
-            String type
-    ) {
+            String type) {
     }
 }

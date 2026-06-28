@@ -9,6 +9,7 @@
 | [architecture.md](architecture.md) | Arquitectura en capas, reglas de dependencia, diagramas |
 | [api-guidelines.md](api-guidelines.md) | Diseño REST, formatos request/response, paginación |
 | [database.md](database.md) | Convenciones de BD, Flyway, nomenclatura de esquema |
+| [telegram.md](telegram.md) | Integración con Telegram: configuración, vinculación, comandos, notificaciones |
 
 ## Instrucciones para Copilot
 

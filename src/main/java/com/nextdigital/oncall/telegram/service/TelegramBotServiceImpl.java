@@ -230,16 +230,16 @@ public class TelegramBotServiceImpl implements TelegramBotService {
 
         var welcomeMessage = """
                 🤖 *Bienvenido al bot de Oncall*
-                
+
                 Para vincular tu cuenta de Telegram con tu perfil de Oncall:
-                
+
                 1. Copia este código de verificación:
                 `%s`
-                
+
                 2. Ve a la aplicación web de Oncall, a tu perfil, e ingresa el código.
-                
+
                 ⏰ El código expira en 15 minutos.
-                
+
                 Si no tienes cuenta en Oncall, contacta con tu administrador.
                 """.formatted(code);
 
@@ -284,13 +284,50 @@ public class TelegramBotServiceImpl implements TelegramBotService {
     }
 
     // ========================================================================
+    // Invite link generation
+    // ========================================================================
+
+    @Override
+    @Transactional
+    public String generateGroupInviteLink(UUID groupId) {
+        var group = onCallGroupRepository.findById(groupId).orElse(null);
+        if (group == null) {
+            log.warn("Cannot generate invite link: group {} not found", groupId);
+            return null;
+        }
+
+        var botToken = group.getTelegramBotToken();
+        var chatId = group.getTelegramGroupChatId();
+
+        if (botToken == null || chatId == null) {
+            log.warn("Cannot generate invite link for group {}: bot not fully configured", groupId);
+            return null;
+        }
+
+        // First verify the bot is in the group
+        if (!apiClient.verifyBotInGroup(botToken, chatId)) {
+            log.warn("Cannot generate invite link for group {}: bot not in group or not admin", groupId);
+            return null;
+        }
+
+        // Generate the invite link
+        var inviteLink = apiClient.createChatInviteLink(botToken, chatId);
+        if (inviteLink != null) {
+            group.setTelegramGroupInviteLink(inviteLink);
+            onCallGroupRepository.save(group);
+            log.info("Invite link generated for group {}: {}", groupId, inviteLink);
+        }
+
+        return inviteLink;
+    }
+
+    // ========================================================================
     // Internal state
     // ========================================================================
 
     private record BotInstance(
             String botToken,
             String chatId,
-            long lastUpdateId
-    ) {
+            long lastUpdateId) {
     }
 }

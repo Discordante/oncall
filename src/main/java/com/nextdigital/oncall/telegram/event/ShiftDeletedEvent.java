@@ -13,6 +13,5 @@ public record ShiftDeletedEvent(
         String personName,
         String groupName,
         OffsetDateTime startTime,
-        OffsetDateTime endTime
-) {
+        OffsetDateTime endTime) {
 }

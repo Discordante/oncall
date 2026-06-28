@@ -1,5 +1,10 @@
 package com.nextdigital.oncall.entity;
 
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+import org.hibernate.annotations.CreationTimestamp;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -11,10 +16,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.CreationTimestamp;
-
-import java.time.OffsetDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "telegram_pending_links")

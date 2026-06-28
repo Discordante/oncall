@@ -15,6 +15,5 @@ public record ShiftUpdatedEvent(
         OffsetDateTime oldStartTime,
         OffsetDateTime oldEndTime,
         OffsetDateTime newStartTime,
-        OffsetDateTime newEndTime
-) {
+        OffsetDateTime newEndTime) {
 }

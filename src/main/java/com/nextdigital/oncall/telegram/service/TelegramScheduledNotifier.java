@@ -43,7 +43,8 @@ public class TelegramScheduledNotifier {
             }
 
             var sb = new StringBuilder();
-            sb.append("☀️ *Resumen del día* — ").append(today.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).append("\n\n");
+            sb.append("☀️ *Resumen del día* — ").append(today.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+                    .append("\n\n");
 
             for (var shift : shifts) {
                 sb.append("👤 *").append(shift.personName()).append("*\n");

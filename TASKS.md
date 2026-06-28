@@ -31,6 +31,9 @@
 - [x] Eventos Spring: `ShiftCreatedEvent`, `ShiftUpdatedEvent`, `ShiftDeletedEvent`.
 - [x] Notificaciones automáticas en grupo y a persona vinculada vía `ShiftNotificationListener`.
 - [x] Resúmenes programados: diario (8 AM) y semanal (lunes 9 AM) vía `TelegramScheduledNotifier`.
+- [x] Migración V4: columna `telegram_group_invite_link` en `on_call_groups`.
+- [x] Al configurar bot + chat ID en un grupo, se genera automáticamente un enlace de invitación (`createChatInviteLink`) y se guarda en BD.
+- [x] El enlace de invitación se expone en `GET /api/v1/on-call-groups/{id}` como `telegramGroupInviteLink`.
 - [ ] Tests unitarios e integración de los nuevos componentes Telegram.
 
 ## Completado

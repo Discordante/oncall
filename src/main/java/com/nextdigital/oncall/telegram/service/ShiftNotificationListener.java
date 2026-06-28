@@ -30,29 +30,29 @@ public class ShiftNotificationListener {
 
         var groupMsg = """
                 🆕 *Nueva guardia asignada*
-                
+
                 👤 *%s*
                 📆 %s → %s
                 ⏱ %d h
                 """.formatted(
-                        event.personName(),
-                        formatDateTime(event.startTime()),
-                        formatDateTime(event.endTime()),
-                        durationHours(event.startTime(), event.endTime()));
+                event.personName(),
+                formatDateTime(event.startTime()),
+                formatDateTime(event.endTime()),
+                durationHours(event.startTime(), event.endTime()));
 
         botService.notifyGroup(event.groupId(), groupMsg);
 
         var personMsg = """
                 🆕 *Se te ha asignado una nueva guardia*
-                
+
                 📋 Grupo: *%s*
                 📆 %s → %s
                 ⏱ %d h
                 """.formatted(
-                        event.groupName(),
-                        formatDateTime(event.startTime()),
-                        formatDateTime(event.endTime()),
-                        durationHours(event.startTime(), event.endTime()));
+                event.groupName(),
+                formatDateTime(event.startTime()),
+                formatDateTime(event.endTime()),
+                durationHours(event.startTime(), event.endTime()));
 
         botService.notifyPerson(event.personId(), personMsg);
     }
@@ -63,31 +63,31 @@ public class ShiftNotificationListener {
 
         var groupMsg = """
                 🔄 *Guardia modificada*
-                
+
                 👤 *%s*
                 📆 Anterior: %s → %s
                 📆 Nueva: %s → %s
                 """.formatted(
-                        event.personName(),
-                        formatDateTime(event.oldStartTime()),
-                        formatDateTime(event.oldEndTime()),
-                        formatDateTime(event.newStartTime()),
-                        formatDateTime(event.newEndTime()));
+                event.personName(),
+                formatDateTime(event.oldStartTime()),
+                formatDateTime(event.oldEndTime()),
+                formatDateTime(event.newStartTime()),
+                formatDateTime(event.newEndTime()));
 
         botService.notifyGroup(event.groupId(), groupMsg);
 
         var personMsg = """
                 🔄 *Tu guardia ha sido modificada*
-                
+
                 📋 Grupo: *%s*
                 📆 Anterior: %s → %s
                 📆 Nueva: %s → %s
                 """.formatted(
-                        event.groupName(),
-                        formatDateTime(event.oldStartTime()),
-                        formatDateTime(event.oldEndTime()),
-                        formatDateTime(event.newStartTime()),
-                        formatDateTime(event.newEndTime()));
+                event.groupName(),
+                formatDateTime(event.oldStartTime()),
+                formatDateTime(event.oldEndTime()),
+                formatDateTime(event.newStartTime()),
+                formatDateTime(event.newEndTime()));
 
         botService.notifyPerson(event.personId(), personMsg);
     }
@@ -98,25 +98,25 @@ public class ShiftNotificationListener {
 
         var groupMsg = """
                 ❌ *Guardia cancelada*
-                
+
                 👤 *%s*
                 📆 %s → %s
                 """.formatted(
-                        event.personName(),
-                        formatDateTime(event.startTime()),
-                        formatDateTime(event.endTime()));
+                event.personName(),
+                formatDateTime(event.startTime()),
+                formatDateTime(event.endTime()));
 
         botService.notifyGroup(event.groupId(), groupMsg);
 
         var personMsg = """
                 ❌ *Tu guardia ha sido cancelada*
-                
+
                 📋 Grupo: *%s*
                 📆 %s → %s
                 """.formatted(
-                        event.groupName(),
-                        formatDateTime(event.startTime()),
-                        formatDateTime(event.endTime()));
+                event.groupName(),
+                formatDateTime(event.startTime()),
+                formatDateTime(event.endTime()));
 
         botService.notifyPerson(event.personId(), personMsg);
     }

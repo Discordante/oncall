@@ -45,4 +45,13 @@ public interface TelegramBotService {
      * Called at application startup.
      */
     void initializeAllBots();
+
+    /**
+     * Generates (or refreshes) a Telegram group invite link for an on-call group.
+     * The bot must be an administrator in the group.
+     *
+     * @param groupId the on-call group ID
+     * @return the invite link, or null if failed
+     */
+    String generateGroupInviteLink(UUID groupId);
 }

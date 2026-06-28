@@ -18,8 +18,7 @@ public final class PersonMapper {
                 entity.getIsActive(),
                 entity.getTelegramChatId() != null,
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
-        );
+                entity.getUpdatedAt());
     }
 
     public static Person toEntity(PersonRequest request) {

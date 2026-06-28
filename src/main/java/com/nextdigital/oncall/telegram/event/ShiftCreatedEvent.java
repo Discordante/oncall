@@ -13,6 +13,5 @@ public record ShiftCreatedEvent(
         String personName,
         String groupName,
         OffsetDateTime startTime,
-        OffsetDateTime endTime
-) {
+        OffsetDateTime endTime) {
 }
