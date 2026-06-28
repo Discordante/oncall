@@ -22,6 +22,9 @@ public record PersonResponse(
         @Schema(description = "Indica si la persona está activa", example = "true")
         Boolean isActive,
 
+        @Schema(description = "Indica si la persona tiene una cuenta de Telegram vinculada", example = "true")
+        boolean telegramLinked,
+
         @Schema(description = "Fecha y hora de creación", example = "2026-06-27T10:30:00Z")
         OffsetDateTime createdAt,
 

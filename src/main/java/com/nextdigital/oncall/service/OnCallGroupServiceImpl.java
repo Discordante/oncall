@@ -19,6 +19,7 @@ import com.nextdigital.oncall.mapper.OnCallGroupMapper;
 import com.nextdigital.oncall.repository.ApplicationRepository;
 import com.nextdigital.oncall.repository.OnCallGroupRepository;
 import com.nextdigital.oncall.repository.PersonRepository;
+import com.nextdigital.oncall.telegram.service.TelegramBotService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,7 @@ public class OnCallGroupServiceImpl implements OnCallGroupService {
     private final OnCallGroupRepository repository;
     private final ApplicationRepository applicationRepository;
     private final PersonRepository personRepository;
+    private final TelegramBotService telegramBotService;
 
     @Override
     @Transactional(readOnly = true)
@@ -54,6 +56,11 @@ public class OnCallGroupServiceImpl implements OnCallGroupService {
         var entity = OnCallGroupMapper.toEntity(request, applications, people);
         var saved = repository.save(entity);
         log.info("OnCallGroup created: {}", saved.getId());
+
+        if (Boolean.TRUE.equals(saved.getTelegramBotEnabled())) {
+            telegramBotService.registerGroupBot(saved.getId());
+        }
+
         return OnCallGroupMapper.toResponse(saved);
     }
 
@@ -61,11 +68,20 @@ public class OnCallGroupServiceImpl implements OnCallGroupService {
     @Transactional
     public OnCallGroupResponse update(UUID id, OnCallGroupRequest request) {
         var entity = findEntity(id);
+        boolean wasEnabled = Boolean.TRUE.equals(entity.getTelegramBotEnabled());
         var applications = resolveApplications(request.applicationIds());
         var people = resolvePeople(request.personIds());
         OnCallGroupMapper.updateEntity(request, entity, applications, people);
         var saved = repository.save(entity);
         log.info("OnCallGroup updated: {}", saved.getId());
+
+        boolean nowEnabled = Boolean.TRUE.equals(saved.getTelegramBotEnabled());
+        if (nowEnabled && !wasEnabled) {
+            telegramBotService.registerGroupBot(saved.getId());
+        } else if (!nowEnabled && wasEnabled) {
+            telegramBotService.unregisterGroupBot(saved.getId());
+        }
+
         return OnCallGroupMapper.toResponse(saved);
     }
 
@@ -73,6 +89,7 @@ public class OnCallGroupServiceImpl implements OnCallGroupService {
     @Transactional
     public void delete(UUID id) {
         var entity = findEntity(id);
+        telegramBotService.unregisterGroupBot(id);
         repository.delete(entity);
         log.info("OnCallGroup deleted: {}", id);
     }

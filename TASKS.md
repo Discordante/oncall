@@ -2,10 +2,13 @@
 
 ## Sprint actual (Facturación y Liquidación)
 
-- [ ] Implementar endpoint de cálculo de nómina/facturación mensual:
-  - Calcular el sumatorio de la duración de todos los `Shifts` de una persona en un mes.
-  - Prorratear el valor económico bruto acumulado según el `gross_price_per_day` del grupo correspondiente.
-- [ ] Endpoint para exportar el resumen de pagos mensual de un grupo de guardia.
+- [x] Implementar endpoint de cálculo de nómina/facturación mensual:
+  - Nuevo `BillingController` en `GET /api/v1/billing?groupId=&personId=&from=&to=`.
+  - Calcula horas totales por persona en un rango de fechas (por defecto mes actual).
+  - Busca el precio histórico vigente para cada turno (`on_call_group_price_history`).
+  - Prorratea el valor económico bruto: `(horas / 24) × precio_del_día`.
+  - Si el precio cambió durante el período, cada turno se calcula con su precio vigente.
+- [ ] Endpoint para exportar el resumen de pagos en base a un rango de fechas de un grupo de guardia (facturación mensual).
 
 ## Backlog
 
@@ -14,7 +17,34 @@
 - [ ] Vista de calendario interactiva para ver los rangos de tiempo de cada persona.
 - [ ] Exportación de calendarios en formato iCal.
 
+## Sprint: Integración Telegram
+
+- [x] Migración Flyway V3: columnas Telegram en `people` y `on_call_groups`, tabla `telegram_pending_links`.
+- [x] Entidades actualizadas: `Person` (+telegramChatId, telegramLinkCode, telegramLinkedAt), `OnCallGroup` (+telegramBotToken, telegramGroupChatId, telegramBotEnabled).
+- [x] Nuevo DTO: `OnCallGroupRequest`/`Response` con campos Telegram (token nunca en response).
+- [x] Nuevo DTO: `TelegramLinkRequest`/`TelegramLinkResponse` para vinculación.
+- [x] Nuevo `TelegramController` con `POST /api/v1/telegram/link` y `GET /api/v1/telegram/link-status`.
+- [x] Cliente API Telegram vía `RestClient` (`TelegramApiClient`) — sin librerías externas.
+- [x] Servicio `TelegramBotServiceImpl` con polling `@Scheduled`, vinculación por código único, registro de bots por grupo.
+- [x] Inicializador `TelegramBotInitializer` que arranca bots de grupos habilitados.
+- [x] Comandos: `/info` (ayuda), `/turnos` (calendario 4 semanas vía `ShiftService`), `/start` (vinculación).
+- [x] Eventos Spring: `ShiftCreatedEvent`, `ShiftUpdatedEvent`, `ShiftDeletedEvent`.
+- [x] Notificaciones automáticas en grupo y a persona vinculada vía `ShiftNotificationListener`.
+- [x] Resúmenes programados: diario (8 AM) y semanal (lunes 9 AM) vía `TelegramScheduledNotifier`.
+- [ ] Tests unitarios e integración de los nuevos componentes Telegram.
+
 ## Completado
+
+### Sprint: Facturación y Liquidación
+
+- [x] Endpoint `GET /api/v1/billing?groupId=...&personId=...&from=...&to=`.
+- [x] Migración Flyway V2: tabla `on_call_group_price_history` con rangos de vigencia (`effective_from`/`effective_to`).
+- [x] Entidad `OnCallGroupPriceHistory`, repositorio con query `findEffectivePrice(groupId, date)`.
+- [x] DTOs: `BillingPersonDetail` (horas, días, importe por persona) y `BillingReportResponse` (reporte completo).
+- [x] Servicio `BillingService` con lógica de cálculo usando `BigDecimal` y precios históricos.
+- [x] Tests unitarios (8 tests): cálculo correcto, múltiples personas, precio histórico, filtro por persona, fechas por defecto, grupo inexistente, turno fraccionado.
+- [x] Tests de integración (5 tests): dos personas, filtro por persona, período vacío, 404 grupo inexistente, 400 sin groupId.
+- [x] Handler global para `MissingServletRequestParameterException` (400 BAD_REQUEST).
 
 ### Sprint: Operativa de Turnos e Intercambios
 

@@ -32,6 +32,16 @@ public class OnCallGroup {
     @Column(name = "gross_price_per_day", precision = 10, scale = 2)
     private BigDecimal grossPricePerDay;
 
+    @Column(name = "telegram_bot_token")
+    private String telegramBotToken;
+
+    @Column(name = "telegram_group_chat_id")
+    private String telegramGroupChatId;
+
+    @Column(name = "telegram_bot_enabled", nullable = false)
+    @Builder.Default
+    private Boolean telegramBotEnabled = false;
+
     @ManyToMany
     @JoinTable(
             name = "on_call_group_apps",

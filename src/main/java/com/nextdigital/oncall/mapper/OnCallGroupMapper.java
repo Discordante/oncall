@@ -29,6 +29,8 @@ public final class OnCallGroupMapper {
                 entity.getId(),
                 entity.getName(),
                 entity.getGrossPricePerDay(),
+                entity.getTelegramGroupChatId(),
+                entity.getTelegramBotEnabled() != null && entity.getTelegramBotEnabled(),
                 applications,
                 people,
                 entity.getCreatedAt(),
@@ -39,12 +41,24 @@ public final class OnCallGroupMapper {
     public static OnCallGroup toEntity(OnCallGroupRequest request,
                                        Set<Application> applications,
                                        Set<Person> people) {
-        return OnCallGroup.builder()
+        var group = OnCallGroup.builder()
                 .name(request.name())
                 .grossPricePerDay(request.grossPricePerDay())
                 .applications(applications)
                 .people(people)
                 .build();
+
+        if (request.telegramBotToken() != null) {
+            group.setTelegramBotToken(request.telegramBotToken());
+        }
+        if (request.telegramGroupChatId() != null) {
+            group.setTelegramGroupChatId(request.telegramGroupChatId());
+        }
+        if (request.telegramBotEnabled() != null) {
+            group.setTelegramBotEnabled(request.telegramBotEnabled());
+        }
+
+        return group;
     }
 
     public static void updateEntity(OnCallGroupRequest request,
@@ -55,5 +69,15 @@ public final class OnCallGroupMapper {
         entity.setGrossPricePerDay(request.grossPricePerDay());
         entity.setApplications(applications);
         entity.setPeople(people);
+
+        if (request.telegramBotToken() != null) {
+            entity.setTelegramBotToken(request.telegramBotToken());
+        }
+        if (request.telegramGroupChatId() != null) {
+            entity.setTelegramGroupChatId(request.telegramGroupChatId());
+        }
+        if (request.telegramBotEnabled() != null) {
+            entity.setTelegramBotEnabled(request.telegramBotEnabled());
+        }
     }
 }

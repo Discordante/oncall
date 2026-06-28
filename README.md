@@ -118,7 +118,7 @@ Las migraciones están en `src/main/resources/db/migration/` y se aplican autom�
 
 Hibernate opera con `ddl-auto=validate`: el esquema lo gestiona exclusivamente Flyway, Hibernate solo valida que las entidades coincidan con el esquema existente.
 
-### Esquema actual (V1)
+### Esquema actual (V1 + V2)
 
 | Tabla | Descripción |
 |---|---|
@@ -128,6 +128,10 @@ Hibernate opera con `ddl-auto=validate`: el esquema lo gestiona exclusivamente F
 | `on_call_group_apps` | Relación ManyToMany grupos ↔ aplicaciones |
 | `on_call_group_people` | Relación ManyToMany grupos ↔ personas |
 | `shifts` | Turnos reales con rango de tiempo y CHECK `start_time < end_time` |
+| `on_call_group_price_history` | Historial de precios de grupos con rangos de vigencia (`effective_from`/`effective_to`) |
+
+> **V2**: La migración `V2__add_on_call_group_price_history.sql` añade la tabla de historial de precios
+> y migra automáticamente los precios actuales de cada grupo como su primer registro histórico.
 
 ---
 
@@ -175,6 +179,52 @@ Base URL: `/api/v1/`
 | `PUT` | `/api/v1/shifts/{id}` | Actualizar turno (ajusta turnos adyacentes de la misma persona) |
 | `DELETE` | `/api/v1/shifts/{id}` | Eliminar turno |
 
+### Billing / Facturación
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `GET` | `/api/v1/billing` | Calcular facturación con filtros (`groupId` obligatorio, `personId`, `from`, `to` opcionales) |
+
+**Parámetros:**
+- `groupId` (obligatorio) — ID del grupo de guardia
+- `personId` (opcional) — filtrar por persona específica
+- `from` (opcional, ISO 8601) — inicio del período. Por defecto: inicio del mes actual
+- `to` (opcional, ISO 8601) — fin del período. Por defecto: fin del mes actual
+
+**Cálculo:**
+1. Obtiene todos los turnos del grupo en el rango de fechas
+2. Para cada turno, busca el precio histórico vigente en `shift.startTime` en la tabla `on_call_group_price_history`
+3. Si no hay historial, usa el `gross_price_per_day` actual del grupo
+4. Calcula: `horas → días (horas / 24) → importe (días × precio)`
+5. Agrupa por persona y suma totales del reporte
+
+**Respuesta:**
+```json
+{
+  "data": {
+    "groupId": "uuid",
+    "groupName": "SRE OnCall",
+    "grossPricePerDay": "100.00",
+    "from": "2026-06-01T00:00:00Z",
+    "to": "2026-06-30T23:59:59Z",
+    "totalHours": "36.0000",
+    "totalBilling": "150.00",
+    "details": [
+      {
+        "personId": "uuid",
+        "personName": "Alice",
+        "personEmail": "alice@example.com",
+        "totalHours": "24.0000",
+        "totalDays": "1.0000",
+        "grossPricePerDay": "100.00",
+        "totalBilling": "100.00"
+      }
+    ]
+  },
+  "errors": null
+}
+```
+
 **Comportamiento de creación:**
 - Si la misma persona ya tiene un turno en el rango → **409 Conflict**
 - Si otra persona tiene un turno en el rango → se divide automáticamente (tramos delantero y trasero)
@@ -213,12 +263,13 @@ Todas las respuestas siguen el formato envolvente:
 
 ### Unitarios
 
-40 tests con JUnit 5 + Mockito que cubren los cuatro servicios:
+48 tests con JUnit 5 + Mockito que cubren los cinco servicios:
 
 - `ApplicationServiceImplTest` (8 tests)
 - `PersonServiceImplTest` (8 tests)
 - `OnCallGroupServiceImplTest` (8 tests)
 - `ShiftServiceImplTest` (17 tests)
+- `BillingServiceImplTest` (8 tests)
 
 ```bash
 ./mvnw test
@@ -226,12 +277,13 @@ Todas las respuestas siguen el formato envolvente:
 
 ### Integración
 
-14 tests con Spring Boot Test + Testcontainers (PostgreSQL real en Docker):
+19 tests con Spring Boot Test + Testcontainers (PostgreSQL real en Docker):
 
 - `ApplicationIntegrationTest` (3 tests)
 - `PersonIntegrationTest` (3 tests)
 - `OnCallGroupIntegrationTest` (3 tests)
 - `ShiftIntegrationTest` (5 tests)
+- `BillingIntegrationTest` (5 tests)
 
 ```bash
 ./mvnw verify

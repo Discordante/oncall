@@ -18,6 +18,12 @@ public record OnCallGroupResponse(
         @Schema(description = "Precio bruto por día de guardia", example = "150.00")
         BigDecimal grossPricePerDay,
 
+        @Schema(description = "ID del chat/grupo de Telegram donde opera el bot", example = "-1001234567890")
+        String telegramGroupChatId,
+
+        @Schema(description = "Indica si la integración con Telegram está habilitada", example = "true")
+        boolean telegramBotEnabled,
+
         @Schema(description = "Aplicaciones asignadas al grupo")
         Set<ApplicationResponse> applications,
 

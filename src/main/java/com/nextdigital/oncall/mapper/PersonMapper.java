@@ -16,6 +16,7 @@ public final class PersonMapper {
                 entity.getEmail(),
                 entity.getPhoneNumber(),
                 entity.getIsActive(),
+                entity.getTelegramChatId() != null,
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );

@@ -21,6 +21,13 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
+# Telegram bot integration
+telegram:
+  bot:
+    polling-enabled: true
+    polling-interval-ms: 5000
+    webhook-base-url: ${TELEGRAM_WEBHOOK_URL:}
+
 # SpringDoc OpenAPI
 springdoc:
   api-docs:

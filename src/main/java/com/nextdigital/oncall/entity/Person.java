@@ -38,6 +38,15 @@ public class Person {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "telegram_chat_id", unique = true)
+    private String telegramChatId;
+
+    @Column(name = "telegram_link_code", unique = true)
+    private String telegramLinkCode;
+
+    @Column(name = "telegram_linked_at")
+    private OffsetDateTime telegramLinkedAt;
+
     @ManyToMany(mappedBy = "people")
     @Builder.Default
     private Set<OnCallGroup> onCallGroups = new HashSet<>();

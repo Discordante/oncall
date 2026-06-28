@@ -27,6 +27,7 @@ import com.nextdigital.oncall.exception.ResourceNotFoundException;
 import com.nextdigital.oncall.repository.ApplicationRepository;
 import com.nextdigital.oncall.repository.OnCallGroupRepository;
 import com.nextdigital.oncall.repository.PersonRepository;
+import com.nextdigital.oncall.telegram.service.TelegramBotService;
 
 @ExtendWith(MockitoExtension.class)
 class OnCallGroupServiceImplTest {
@@ -39,6 +40,9 @@ class OnCallGroupServiceImplTest {
 
     @Mock
     private PersonRepository personRepository;
+
+    @Mock
+    private TelegramBotService telegramBotService;
 
     @InjectMocks
     private OnCallGroupServiceImpl service;
@@ -109,6 +113,7 @@ class OnCallGroupServiceImplTest {
         var request = new OnCallGroupRequest(
                 "Holiday OnCall",
                 new BigDecimal("200.00"),
+                null, null, null,
                 Set.of(application.getId()),
                 Set.of(person.getId()));
 
@@ -139,7 +144,7 @@ class OnCallGroupServiceImplTest {
 
     @Test
     void create_withoutApplicationsAndPeople() {
-        var request = new OnCallGroupRequest("Empty Group", null, null, null);
+        var request = new OnCallGroupRequest("Empty Group", null, null, null, null, null, null);
 
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -153,7 +158,7 @@ class OnCallGroupServiceImplTest {
     @Test
     void create_throwsWhenApplicationNotFound() {
         var appId = UUID.randomUUID();
-        var request = new OnCallGroupRequest("Group", null, Set.of(appId), null);
+        var request = new OnCallGroupRequest("Group", null, null, null, null, Set.of(appId), null);
 
         when(applicationRepository.findById(appId)).thenReturn(Optional.empty());
 
@@ -166,7 +171,7 @@ class OnCallGroupServiceImplTest {
     void update_modifiesAndReturnsGroup() {
         var newApp = Application.builder().id(UUID.randomUUID()).name("New App").build();
         var request = new OnCallGroupRequest("Updated Group", new BigDecimal("250.00"),
-                Set.of(newApp.getId()), Set.of(person.getId()));
+                null, null, null, Set.of(newApp.getId()), Set.of(person.getId()));
 
         when(repository.findById(group.getId())).thenReturn(Optional.of(group));
         when(applicationRepository.findById(newApp.getId())).thenReturn(Optional.of(newApp));

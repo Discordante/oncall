@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +21,9 @@ import com.nextdigital.oncall.mapper.ShiftMapper;
 import com.nextdigital.oncall.repository.OnCallGroupRepository;
 import com.nextdigital.oncall.repository.PersonRepository;
 import com.nextdigital.oncall.repository.ShiftRepository;
+import com.nextdigital.oncall.telegram.event.ShiftCreatedEvent;
+import com.nextdigital.oncall.telegram.event.ShiftDeletedEvent;
+import com.nextdigital.oncall.telegram.event.ShiftUpdatedEvent;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +36,7 @@ public class ShiftServiceImpl implements ShiftService {
     private final ShiftRepository repository;
     private final OnCallGroupRepository onCallGroupRepository;
     private final PersonRepository personRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -98,6 +103,13 @@ public class ShiftServiceImpl implements ShiftService {
         var saved = repository.save(entity);
         log.info("Shift created: {} for person {} in group {}",
                 saved.getId(), request.personId(), request.onCallGroupId());
+
+        // 4. Publish event for Telegram notification
+        eventPublisher.publishEvent(new ShiftCreatedEvent(
+                saved.getId(), saved.getOnCallGroup().getId(), saved.getPerson().getId(),
+                saved.getPerson().getName(), saved.getOnCallGroup().getName(),
+                saved.getStartTime(), saved.getEndTime()));
+
         return ShiftMapper.toResponse(saved);
     }
 
@@ -127,6 +139,14 @@ public class ShiftServiceImpl implements ShiftService {
         var saved = repository.save(entity);
         log.info("Shift updated: {} for person {}",
                 saved.getId(), request.personId());
+
+        // 4. Publish event for Telegram notification
+        eventPublisher.publishEvent(new ShiftUpdatedEvent(
+                saved.getId(), saved.getOnCallGroup().getId(), saved.getPerson().getId(),
+                saved.getPerson().getName(), saved.getOnCallGroup().getName(),
+                oldStartTime, oldEndTime,
+                saved.getStartTime(), saved.getEndTime()));
+
         return ShiftMapper.toResponse(saved);
     }
 
@@ -134,8 +154,20 @@ public class ShiftServiceImpl implements ShiftService {
     @Transactional
     public void delete(UUID id) {
         var entity = findEntity(id);
+
+        var groupId = entity.getOnCallGroup().getId();
+        var personId = entity.getPerson().getId();
+        var personName = entity.getPerson().getName();
+        var groupName = entity.getOnCallGroup().getName();
+        var startTime = entity.getStartTime();
+        var endTime = entity.getEndTime();
+
         repository.delete(entity);
         log.info("Shift deleted: {}", id);
+
+        eventPublisher.publishEvent(new ShiftDeletedEvent(
+                id, groupId, personId, personName, groupName,
+                startTime, endTime));
     }
 
     // ──────────────────────────────────────────────

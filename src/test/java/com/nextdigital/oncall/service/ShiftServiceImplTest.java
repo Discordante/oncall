@@ -29,6 +29,8 @@ import com.nextdigital.oncall.repository.OnCallGroupRepository;
 import com.nextdigital.oncall.repository.PersonRepository;
 import com.nextdigital.oncall.repository.ShiftRepository;
 
+import org.springframework.context.ApplicationEventPublisher;
+
 @ExtendWith(MockitoExtension.class)
 class ShiftServiceImplTest {
 
@@ -40,6 +42,9 @@ class ShiftServiceImplTest {
 
     @Mock
     private PersonRepository personRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private ShiftServiceImpl service;
