@@ -28,6 +28,14 @@ telegram:
     polling-interval-ms: 5000
     webhook-base-url: ${TELEGRAM_WEBHOOK_URL:}
 
+# Actuator — solo exponer /health
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+      base-path: /actuator
+
 # SpringDoc OpenAPI
 springdoc:
   api-docs:

@@ -30,7 +30,7 @@
 		<java.version>25</java.version>
 		<flyway.version>11.14.1</flyway.version>
 		<testcontainers.version>2.0.5</testcontainers.version>
-		<springdoc.version>2.8.6</springdoc.version>
+		<springdoc.version>3.0.3</springdoc.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -44,6 +44,12 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+
+		<!-- Actuator -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 
 		<!-- SpringDoc OpenAPI -->
