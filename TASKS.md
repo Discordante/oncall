@@ -82,3 +82,23 @@
 - [x] Crear estructura de paquetes (capas tradicional).
 - [x] Documentar arquitectura, BD y API guidelines.
 - [x] Crear ADR inicial.
+## Sprint: Integración Zadarma — Redirección VoIP
+
+- [x] Migración Flyway V6: columnas `zadarma_sip_id`, `zadarma_redirection_type` en `on_call_groups`; `redirect_status`, `redirect_failed_at`, `redirect_last_attempt_at`, `redirect_retry_count` en `shifts`.
+- [x] Config `ZadarmaConfig` con `@ConfigurationProperties("zadarma")` para api.key, api.secret, base-url y parámetros de reintento.
+- [x] Cliente HTTP `ZadarmaApiClient` con autenticación HMAC-SHA1 vía `RestClient`.
+- [x] `ZadarmaService`/`ZadarmaServiceImpl`: redirigir a persona, desactivar redirección, consultar estado actual, normalizar teléfonos.
+- [x] `CallRedirectionScheduler`: programación event-driven de transiciones (start/end de cada turno), recuperación tras reinicio (`ApplicationReadyEvent`), fallback periódico cada 5 min, reintentos con backoff (30s→60s→...×10).
+- [x] `ShiftServiceImpl.create()`/`update()`/`delete()`: programa/cancela transiciones al crear, modificar o borrar turnos.
+- [x] `ZadarmaRedirectSuccessEvent` + listener: notificación Telegram al chat del grupo cuando la redirección se activa correctamente.
+- [x] `ZadarmaRedirectFailedEvent` + listener: alerta Telegram al chat del grupo cuando la redirección falla (incluye reintento N/M).
+- [x] `ZadarmaApiException` + handler 502 en `GlobalExceptionHandler`.
+- [x] Entidad `OnCallGroup` actualizada con `zadarmaSipId`, `zadarmaRedirectionType`.
+- [x] Entidad `Shift` actualizada con `redirectStatus`, `redirectFailedAt`, `redirectLastAttemptAt`, `redirectRetryCount`.
+- [x] DTOs actualizados: `OnCallGroupRequest`/`Response` (+zadarmaSipId, zadarmaRedirectionType), `ShiftResponse` (+redirectStatus).
+- [x] Mappers actualizados: `OnCallGroupMapper`, `ShiftMapper`.
+- [x] Solo 1 llamada a API Zadarma por redirección (PUT), no el antiguo flujo de 3 llamadas.
+- [x] La redirección solo se cambia al INICIO del turno (no se hace doble PUT al solaparse fin+inicio).
+- [x] Si no hay turno siguiente, se conserva la última redirección activa (no se desactiva).
+- [x] Documentación completa en `docs/zadarma.md`.
+- [x] Total: **122 tests, 0 fallos** (los mismos que antes, no se añadieron tests nuevos).
