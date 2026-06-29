@@ -21,26 +21,26 @@ import lombok.extern.slf4j.Slf4j;
 @ConditionalOnProperty(name = "oncall.shift-generation.enabled", havingValue = "true", matchIfMissing = true)
 public class ShiftGenerationScheduler {
 
-    private final ShiftGenerationService shiftGenerationService;
+        private final ShiftGenerationService shiftGenerationService;
 
-    @Scheduled(cron = "${oncall.shift-generation.cron:0 0 3 * * ?}")
-    public void runGeneration() {
-        log.info("Starting automatic shift generation check...");
-        var results = shiftGenerationService.generateForAllGroups();
+        @Scheduled(cron = "${oncall.shift-generation.cron:0 0 3 * * ?}")
+        public void runGeneration() {
+                log.info("Starting automatic shift generation check...");
+                var results = shiftGenerationService.generateForAllGroups();
 
-        long totalCreated = results.stream()
-                .mapToInt(GenerateShiftsResponse::shiftsCreated)
-                .sum();
-        long groupsWithWarnings = results.stream()
-                .filter(r -> !r.warnings().isEmpty())
-                .count();
+                long totalCreated = results.stream()
+                                .mapToInt(GenerateShiftsResponse::shiftsCreated)
+                                .sum();
+                long groupsWithWarnings = results.stream()
+                                .filter(r -> !r.warnings().isEmpty())
+                                .count();
 
-        log.info("Shift generation complete: {} groups processed, {} shifts created, {} groups with warnings",
-                results.size(), totalCreated, groupsWithWarnings);
+                log.info("Shift generation complete: {} groups processed, {} shifts created, {} groups with warnings",
+                                results.size(), totalCreated, groupsWithWarnings);
 
-        results.stream()
-                .filter(r -> !r.warnings().isEmpty())
-                .forEach(r -> log.warn("Group '{}' ({}) warnings: {}",
-                        r.onCallGroupName(), r.onCallGroupId(), r.warnings()));
-    }
+                results.stream()
+                                .filter(r -> !r.warnings().isEmpty())
+                                .forEach(r -> log.warn("Group '{}' ({}) warnings: {}",
+                                                r.onCallGroupName(), r.onCallGroupId(), r.warnings()));
+        }
 }
