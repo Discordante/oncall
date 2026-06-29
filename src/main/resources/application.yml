@@ -21,6 +21,17 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
+  # OAuth2 Resource Server — Google JWT validation
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://accounts.google.com
+
+# Google OAuth2 Client ID (from Google Cloud Console)
+google:
+  client-id: ${GOOGLE_CLIENT_ID:test-client-id}
+
 # Telegram bot integration
 telegram:
   bot:
@@ -47,3 +58,6 @@ springdoc:
     tags-sorter: alpha
   show-actuator: false
   packages-to-scan: com.nextdigital.oncall.controller
+  oauth:
+    client-id: ${GOOGLE_CLIENT_ID:test-client-id}
+    use-pkce-with-authorization-code-grant: true

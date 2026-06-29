@@ -1,6 +1,7 @@
 package com.nextdigital.oncall.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -50,7 +51,8 @@ class OnCallGroupIntegrationTest {
                 // Create an application to reference
                 var appResult = mockMvc.perform(post("/api/v1/applications")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(new ApplicationRequest("Monitor App", null))))
+                                .content(objectMapper.writeValueAsString(new ApplicationRequest("Monitor App", null)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();
 
@@ -64,7 +66,8 @@ class OnCallGroupIntegrationTest {
                 var personResult = mockMvc.perform(post("/api/v1/people")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
-                                                new PersonRequest("Alice", "alice@example.com", null, true))))
+                                                new PersonRequest("Alice", "alice@example.com", null, true)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();
 
@@ -87,7 +90,8 @@ class OnCallGroupIntegrationTest {
 
                 var createResult = mockMvc.perform(post("/api/v1/on-call-groups")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(createRequest)))
+                                .content(objectMapper.writeValueAsString(createRequest))
+                                .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();
 
@@ -106,7 +110,7 @@ class OnCallGroupIntegrationTest {
                 var createdId = createResponse.data().id();
 
                 // --- GET BY ID ---
-                var getResult = mockMvc.perform(get("/api/v1/on-call-groups/{id}", createdId))
+                var getResult = mockMvc.perform(get("/api/v1/on-call-groups/{id}", createdId).with(jwt()))
                                 .andExpect(status().isOk())
                                 .andReturn();
 
@@ -119,7 +123,7 @@ class OnCallGroupIntegrationTest {
                 assertThat(getResponse.data().people()).hasSize(1);
 
                 // --- LIST ALL ---
-                var listResult = mockMvc.perform(get("/api/v1/on-call-groups"))
+                var listResult = mockMvc.perform(get("/api/v1/on-call-groups").with(jwt()))
                                 .andExpect(status().isOk())
                                 .andReturn();
 
@@ -140,10 +144,11 @@ class OnCallGroupIntegrationTest {
 
                 mockMvc.perform(put("/api/v1/on-call-groups/{id}", createdId)
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(updateRequest)))
+                                .content(objectMapper.writeValueAsString(updateRequest))
+                                .with(jwt()))
                                 .andExpect(status().isOk());
 
-                var getUpdatedResult = mockMvc.perform(get("/api/v1/on-call-groups/{id}", createdId))
+                var getUpdatedResult = mockMvc.perform(get("/api/v1/on-call-groups/{id}", createdId).with(jwt()))
                                 .andExpect(status().isOk())
                                 .andReturn();
 
@@ -158,11 +163,11 @@ class OnCallGroupIntegrationTest {
                 assertThat(getUpdated.data().people()).isEmpty();
 
                 // --- DELETE ---
-                mockMvc.perform(delete("/api/v1/on-call-groups/{id}", createdId))
+                mockMvc.perform(delete("/api/v1/on-call-groups/{id}", createdId).with(jwt()))
                                 .andExpect(status().isNoContent());
 
                 // --- VERIFY 404 AFTER DELETE ---
-                mockMvc.perform(get("/api/v1/on-call-groups/{id}", createdId))
+                mockMvc.perform(get("/api/v1/on-call-groups/{id}", createdId).with(jwt()))
                                 .andExpect(status().isNotFound());
         }
 
@@ -172,7 +177,8 @@ class OnCallGroupIntegrationTest {
 
                 var result = mockMvc.perform(post("/api/v1/on-call-groups")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(invalidRequest)))
+                                .content(objectMapper.writeValueAsString(invalidRequest))
+                                .with(jwt()))
                                 .andExpect(status().isBadRequest())
                                 .andReturn();
 
@@ -186,7 +192,7 @@ class OnCallGroupIntegrationTest {
 
         @Test
         void getById_returns404WhenNotFound() throws Exception {
-                var result = mockMvc.perform(get("/api/v1/on-call-groups/{id}", UUID.randomUUID()))
+                var result = mockMvc.perform(get("/api/v1/on-call-groups/{id}", UUID.randomUUID()).with(jwt()))
                                 .andExpect(status().isNotFound())
                                 .andReturn();
 

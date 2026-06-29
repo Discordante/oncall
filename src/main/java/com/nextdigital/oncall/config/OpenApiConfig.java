@@ -3,10 +3,16 @@ package com.nextdigital.oncall.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
+import io.swagger.v3.oas.models.security.OAuthFlow;
+import io.swagger.v3.oas.models.security.OAuthFlows;
+import io.swagger.v3.oas.models.security.Scopes;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import java.util.List;
 
@@ -34,7 +40,27 @@ public class OpenApiConfig {
                                                                 .description("Servidor de desarrollo local"),
                                                 new Server()
                                                                 .url("https://api.oncall.nextdigital.com")
-                                                                .description("Servidor de producción")));
+                                                                .description("Servidor de producción")))
+                                .components(new Components()
+                                                .addSecuritySchemes("google-oauth2",
+                                                                new SecurityScheme()
+                                                                                .type(SecurityScheme.Type.OAUTH2)
+                                                                                .flows(new OAuthFlows()
+                                                                                                .authorizationCode(
+                                                                                                                new OAuthFlow()
+                                                                                                                                .authorizationUrl(
+                                                                                                                                                "https://accounts.google.com/o/oauth2/v2/auth")
+                                                                                                                                .tokenUrl(
+                                                                                                                                                "https://oauth2.googleapis.com/token")
+                                                                                                                                .scopes(new Scopes()
+                                                                                                                                                .addString("openid",
+                                                                                                                                                                "OpenID Connect")
+                                                                                                                                                .addString("profile",
+                                                                                                                                                                "Profile information")
+                                                                                                                                                .addString("email",
+                                                                                                                                                                "Email address"))))))
+                                .addSecurityItem(new SecurityRequirement()
+                                                .addList("google-oauth2"));
         }
 
 }

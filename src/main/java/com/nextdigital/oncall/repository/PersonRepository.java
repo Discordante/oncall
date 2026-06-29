@@ -12,6 +12,10 @@ public interface PersonRepository extends JpaRepository<Person, UUID> {
 
     List<Person> findByIsActiveTrue();
 
+    Optional<Person> findByEmail(String email);
+
+    Optional<Person> findByGoogleSub(String googleSub);
+
     Optional<Person> findByTelegramChatId(String telegramChatId);
 
     Optional<Person> findByTelegramLinkCode(String telegramLinkCode);

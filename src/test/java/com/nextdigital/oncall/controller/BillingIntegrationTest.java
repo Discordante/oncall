@@ -1,6 +1,7 @@
 package com.nextdigital.oncall.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -59,7 +60,8 @@ class BillingIntegrationTest {
                 // Create an application (needed for group creation)
                 var appResult = mockMvc.perform(post("/api/v1/applications")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(new ApplicationRequest("Monitor App", null))))
+                                .content(objectMapper.writeValueAsString(new ApplicationRequest("Monitor App", null)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();
                 var appResponse = objectMapper.readValue(
@@ -72,7 +74,8 @@ class BillingIntegrationTest {
                 var personAResult = mockMvc.perform(post("/api/v1/people")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
-                                                new PersonRequest("Alice", "alice@example.com", null, true))))
+                                                new PersonRequest("Alice", "alice@example.com", null, true)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();
                 var personAResponse = objectMapper.readValue(
@@ -85,7 +88,8 @@ class BillingIntegrationTest {
                 var personBResult = mockMvc.perform(post("/api/v1/people")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
-                                                new PersonRequest("Bob", "bob@example.com", null, true))))
+                                                new PersonRequest("Bob", "bob@example.com", null, true)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();
                 var personBResponse = objectMapper.readValue(
@@ -99,7 +103,8 @@ class BillingIntegrationTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
                                                 new OnCallGroupRequest("SRE OnCall", new java.math.BigDecimal("100.00"),
-                                                                null, null, null, null, null))))
+                                                                null, null, null, null, null)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();
                 var groupResponse = objectMapper.readValue(
@@ -115,21 +120,24 @@ class BillingIntegrationTest {
                 mockMvc.perform(post("/api/v1/shifts")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
-                                                new ShiftRequest(groupId, personAId, JUN_01, JUN_02))))
+                                                new ShiftRequest(groupId, personAId, JUN_01, JUN_02)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated());
 
                 // Bob: 12h shift Jun 8 00:00 → Jun 8 12:00
                 mockMvc.perform(post("/api/v1/shifts")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
-                                                new ShiftRequest(groupId, personBId, JUN_08, JUN_08_12))))
+                                                new ShiftRequest(groupId, personBId, JUN_08, JUN_08_12)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated());
 
                 // Calculate billing for June
                 var result = mockMvc.perform(get("/api/v1/billing")
                                 .param("groupId", groupId.toString())
                                 .param("from", JUN_01.toString())
-                                .param("to", JUN_30.toString()))
+                                .param("to", JUN_30.toString())
+                                .with(jwt()))
                                 .andExpect(status().isOk())
                                 .andReturn();
 
@@ -175,14 +183,16 @@ class BillingIntegrationTest {
                 mockMvc.perform(post("/api/v1/shifts")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
-                                                new ShiftRequest(groupId, personAId, JUN_01, JUN_02))))
+                                                new ShiftRequest(groupId, personAId, JUN_01, JUN_02)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated());
 
                 // Bob: 12h shift Jun 8 → Jun 8 12:00
                 mockMvc.perform(post("/api/v1/shifts")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
-                                                new ShiftRequest(groupId, personBId, JUN_08, JUN_08_12))))
+                                                new ShiftRequest(groupId, personBId, JUN_08, JUN_08_12)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated());
 
                 // Filter by Alice only
@@ -190,7 +200,8 @@ class BillingIntegrationTest {
                                 .param("groupId", groupId.toString())
                                 .param("personId", personAId.toString())
                                 .param("from", JUN_01.toString())
-                                .param("to", JUN_30.toString()))
+                                .param("to", JUN_30.toString())
+                                .with(jwt()))
                                 .andExpect(status().isOk())
                                 .andReturn();
 
@@ -216,7 +227,8 @@ class BillingIntegrationTest {
                 var result = mockMvc.perform(get("/api/v1/billing")
                                 .param("groupId", groupId.toString())
                                 .param("from", jul_01.toString())
-                                .param("to", jul_31.toString()))
+                                .param("to", jul_31.toString())
+                                .with(jwt()))
                                 .andExpect(status().isOk())
                                 .andReturn();
 
@@ -241,7 +253,8 @@ class BillingIntegrationTest {
                 mockMvc.perform(get("/api/v1/billing")
                                 .param("groupId", fakeId.toString())
                                 .param("from", JUN_01.toString())
-                                .param("to", JUN_30.toString()))
+                                .param("to", JUN_30.toString())
+                                .with(jwt()))
                                 .andExpect(status().isNotFound());
         }
 
@@ -249,7 +262,8 @@ class BillingIntegrationTest {
         void calculateBilling_withoutGroupId_returns400() throws Exception {
                 mockMvc.perform(get("/api/v1/billing")
                                 .param("from", JUN_01.toString())
-                                .param("to", JUN_30.toString()))
+                                .param("to", JUN_30.toString())
+                                .with(jwt()))
                                 .andExpect(status().isBadRequest());
         }
 }

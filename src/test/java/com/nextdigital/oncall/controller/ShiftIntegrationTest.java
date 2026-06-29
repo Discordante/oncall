@@ -1,6 +1,7 @@
 package com.nextdigital.oncall.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -61,7 +62,8 @@ class ShiftIntegrationTest {
                 // Create an application
                 var appResult = mockMvc.perform(post("/api/v1/applications")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(new ApplicationRequest("Monitor App", null))))
+                                .content(objectMapper.writeValueAsString(new ApplicationRequest("Monitor App", null)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();
                 var appResponse = objectMapper.readValue(
@@ -74,7 +76,8 @@ class ShiftIntegrationTest {
                 var personResult = mockMvc.perform(post("/api/v1/people")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
-                                                new PersonRequest("Alice", "alice@example.com", null, true))))
+                                                new PersonRequest("Alice", "alice@example.com", null, true)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();
                 var personResponse = objectMapper.readValue(
@@ -87,7 +90,8 @@ class ShiftIntegrationTest {
                 var groupResult = mockMvc.perform(post("/api/v1/on-call-groups")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(new OnCallGroupRequest("Weekend OnCall", null,
-                                                null, null, null, null, null))))
+                                                null, null, null, null, null)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();
                 var groupResponse = objectMapper.readValue(
@@ -104,7 +108,8 @@ class ShiftIntegrationTest {
 
                 var createResult = mockMvc.perform(post("/api/v1/shifts")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(createRequest)))
+                                .content(objectMapper.writeValueAsString(createRequest))
+                                .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();
 
@@ -123,7 +128,7 @@ class ShiftIntegrationTest {
                 var createdId = createResponse.data().id();
 
                 // --- GET BY ID ---
-                var getResult = mockMvc.perform(get("/api/v1/shifts/{id}", createdId))
+                var getResult = mockMvc.perform(get("/api/v1/shifts/{id}", createdId).with(jwt()))
                                 .andExpect(status().isOk())
                                 .andReturn();
 
@@ -136,7 +141,7 @@ class ShiftIntegrationTest {
                 assertThat(getResponse.data().onCallGroupName()).isEqualTo("Weekend OnCall");
 
                 // --- LIST ALL ---
-                var listResult = mockMvc.perform(get("/api/v1/shifts"))
+                var listResult = mockMvc.perform(get("/api/v1/shifts").with(jwt()))
                                 .andExpect(status().isOk())
                                 .andReturn();
 
@@ -151,7 +156,8 @@ class ShiftIntegrationTest {
                 var filteredResult = mockMvc.perform(get("/api/v1/shifts")
                                 .param("personId", personId.toString())
                                 .param("from", DAY10_00.toString())
-                                .param("to", DAY17_08.toString()))
+                                .param("to", DAY17_08.toString())
+                                .with(jwt()))
                                 .andExpect(status().isOk())
                                 .andReturn();
 
@@ -167,10 +173,11 @@ class ShiftIntegrationTest {
 
                 mockMvc.perform(put("/api/v1/shifts/{id}", createdId)
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(updateRequest)))
+                                .content(objectMapper.writeValueAsString(updateRequest))
+                                .with(jwt()))
                                 .andExpect(status().isOk());
 
-                var getUpdatedResult = mockMvc.perform(get("/api/v1/shifts/{id}", createdId))
+                var getUpdatedResult = mockMvc.perform(get("/api/v1/shifts/{id}", createdId).with(jwt()))
                                 .andExpect(status().isOk())
                                 .andReturn();
 
@@ -182,11 +189,11 @@ class ShiftIntegrationTest {
                 assertThat(getUpdated.data().endTime()).isEqualTo(DAY14_00);
 
                 // --- DELETE ---
-                mockMvc.perform(delete("/api/v1/shifts/{id}", createdId))
+                mockMvc.perform(delete("/api/v1/shifts/{id}", createdId).with(jwt()))
                                 .andExpect(status().isNoContent());
 
                 // --- VERIFY 404 AFTER DELETE ---
-                mockMvc.perform(get("/api/v1/shifts/{id}", createdId))
+                mockMvc.perform(get("/api/v1/shifts/{id}", createdId).with(jwt()))
                                 .andExpect(status().isNotFound());
         }
 
@@ -196,14 +203,16 @@ class ShiftIntegrationTest {
                 var firstRequest = new ShiftRequest(groupId, personId, DAY10_00, DAY14_00);
                 mockMvc.perform(post("/api/v1/shifts")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(firstRequest)))
+                                .content(objectMapper.writeValueAsString(firstRequest))
+                                .with(jwt()))
                                 .andExpect(status().isCreated());
 
                 // Try to create overlapping shift for same person
                 var overlapRequest = new ShiftRequest(groupId, personId, DAY12_00, DAY17_08);
                 var result = mockMvc.perform(post("/api/v1/shifts")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(overlapRequest)))
+                                .content(objectMapper.writeValueAsString(overlapRequest))
+                                .with(jwt()))
                                 .andExpect(status().isConflict())
                                 .andReturn();
 
@@ -222,7 +231,8 @@ class ShiftIntegrationTest {
                 var bobResult = mockMvc.perform(post("/api/v1/people")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
-                                                new PersonRequest("Bob", "bob@example.com", null, true))))
+                                                new PersonRequest("Bob", "bob@example.com", null, true)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();
                 var bobResponse = objectMapper.readValue(
@@ -235,21 +245,24 @@ class ShiftIntegrationTest {
                 mockMvc.perform(post("/api/v1/shifts")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
-                                                new ShiftRequest(groupId, personId, DAY10_00, DAY17_08))))
+                                                new ShiftRequest(groupId, personId, DAY10_00, DAY17_08)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated());
 
                 // Bob takes DAY15_12 → DAY15_21 → should split Alice's shift
                 mockMvc.perform(post("/api/v1/shifts")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
-                                                new ShiftRequest(groupId, bobId, DAY15_12, DAY15_21))))
+                                                new ShiftRequest(groupId, bobId, DAY15_12, DAY15_21)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated());
 
                 // Verify Alice now has 2 shifts (before and after Bob's)
                 var aliceShiftsResult = mockMvc.perform(get("/api/v1/shifts")
                                 .param("personId", personId.toString())
                                 .param("from", DAY10_00.toString())
-                                .param("to", DAY17_08.toString()))
+                                .param("to", DAY17_08.toString())
+                                .with(jwt()))
                                 .andExpect(status().isOk())
                                 .andReturn();
 
@@ -273,7 +286,8 @@ class ShiftIntegrationTest {
 
                 var result = mockMvc.perform(post("/api/v1/shifts")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(invalidRequest)))
+                                .content(objectMapper.writeValueAsString(invalidRequest))
+                                .with(jwt()))
                                 .andExpect(status().isBadRequest())
                                 .andReturn();
 
@@ -292,7 +306,8 @@ class ShiftIntegrationTest {
                 var createResult = mockMvc.perform(post("/api/v1/shifts")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
-                                                new ShiftRequest(groupId, personId, DAY10_00, DAY14_00))))
+                                                new ShiftRequest(groupId, personId, DAY10_00, DAY14_00)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();
 
@@ -306,7 +321,8 @@ class ShiftIntegrationTest {
                 mockMvc.perform(post("/api/v1/shifts")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
-                                                new ShiftRequest(groupId, personId, DAY14_00, DAY17_08))))
+                                                new ShiftRequest(groupId, personId, DAY14_00, DAY17_08)))
+                                .with(jwt()))
                                 .andExpect(status().isCreated());
 
                 // Try to extend shift1 to DAY17_08 → would make shift2 invalid (startTime =
@@ -314,13 +330,14 @@ class ShiftIntegrationTest {
                 mockMvc.perform(put("/api/v1/shifts/{id}", shift1Id)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
-                                                new ShiftRequest(groupId, personId, DAY10_00, DAY17_08))))
+                                                new ShiftRequest(groupId, personId, DAY10_00, DAY17_08)))
+                                .with(jwt()))
                                 .andExpect(status().isBadRequest());
         }
 
         @Test
         void getById_returns404WhenNotFound() throws Exception {
-                var result = mockMvc.perform(get("/api/v1/shifts/{id}", UUID.randomUUID()))
+                var result = mockMvc.perform(get("/api/v1/shifts/{id}", UUID.randomUUID()).with(jwt()))
                                 .andExpect(status().isNotFound())
                                 .andReturn();
 

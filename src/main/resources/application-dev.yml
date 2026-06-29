@@ -9,3 +9,12 @@ spring:
 
   jpa:
     show-sql: true
+
+google:
+  client-id: 540224367088-i5cse7n43j5bbnj7nrmk36c1caqh1juu.apps.googleusercontent.com
+
+springdoc:
+  swagger-ui:
+    oauth:
+      client-id: 540224367088-i5cse7n43j5bbnj7nrmk36c1caqh1juu.apps.googleusercontent.com
+      use-pkce-with-authorization-code-grant: true

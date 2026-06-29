@@ -24,6 +24,34 @@ public class PersonServiceImpl implements PersonService {
     private final PersonRepository repository;
 
     @Override
+    @Transactional
+    public Person syncFromGoogle(String email, String name, String googleSub) {
+        var existing = repository.findByEmail(email);
+        if (existing.isPresent()) {
+            var person = existing.get();
+            if (person.getGoogleSub() == null) {
+                person.setGoogleSub(googleSub);
+                person.setName(name);
+                var saved = repository.save(person);
+                log.info("Person updated with googleSub: {} ({})", saved.getId(), email);
+                return saved;
+            }
+            log.debug("Person already has googleSub: {} ({})", person.getId(), email);
+            return person;
+        }
+
+        var newPerson = Person.builder()
+                .name(name)
+                .email(email)
+                .isActive(true)
+                .googleSub(googleSub)
+                .build();
+        var saved = repository.save(newPerson);
+        log.info("Person auto-created from Google SSO: {} ({})", saved.getId(), email);
+        return saved;
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<PersonResponse> findAll(boolean includeInactive) {
         if (includeInactive) {

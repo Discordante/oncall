@@ -1,0 +1,1 @@
+ALTER TABLE people ADD COLUMN google_sub VARCHAR(255) UNIQUE;

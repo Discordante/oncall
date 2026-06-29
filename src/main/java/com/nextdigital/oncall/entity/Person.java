@@ -55,6 +55,9 @@ public class Person {
     @Column(name = "telegram_chat_id", unique = true)
     private String telegramChatId;
 
+    @Column(name = "google_sub", unique = true)
+    private String googleSub;
+
     @Column(name = "telegram_link_code", unique = true)
     private String telegramLinkCode;
 

@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import com.nextdigital.oncall.dto.PersonRequest;
 import com.nextdigital.oncall.dto.PersonResponse;
+import com.nextdigital.oncall.entity.Person;
 
 public interface PersonService {
 
@@ -17,4 +18,6 @@ public interface PersonService {
     PersonResponse update(UUID id, PersonRequest request);
 
     void delete(UUID id);
+
+    Person syncFromGoogle(String email, String name, String googleSub);
 }
