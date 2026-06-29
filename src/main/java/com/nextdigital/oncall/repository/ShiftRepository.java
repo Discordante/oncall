@@ -2,6 +2,7 @@ package com.nextdigital.oncall.repository;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -73,6 +74,8 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
 
         List<Shift> findByOnCallGroupIdAndEndTimeGreaterThanOrderByStartTimeAsc(
                         UUID onCallGroupId, OffsetDateTime now);
+
+        Optional<Shift> findTopByOnCallGroupIdOrderByEndTimeDesc(UUID onCallGroupId);
 
         List<Shift> findByRedirectStatus(String redirectStatus);
 }

@@ -15,9 +15,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nextdigital.oncall.dto.ApiResponse;
+import com.nextdigital.oncall.dto.GenerateShiftsResponse;
 import com.nextdigital.oncall.dto.OnCallGroupRequest;
 import com.nextdigital.oncall.dto.OnCallGroupResponse;
 import com.nextdigital.oncall.service.OnCallGroupService;
+import com.nextdigital.oncall.service.ShiftGenerationService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -32,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 public class OnCallGroupController {
 
     private final OnCallGroupService service;
+    private final ShiftGenerationService shiftGenerationService;
 
     @GetMapping
     @Operation(summary = "Listar todos los grupos de guardia",
@@ -89,5 +92,18 @@ public class OnCallGroupController {
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/generate-shifts")
+    @Operation(summary = "Generar turnos automáticamente",
+               description = "Genera turnos semanales para las siguientes semanas a partir del turno más lejano del grupo. "
+                           + "Los turnos se asignan a la persona con menor tiempo total de guardia para garantizar equidad.")
+    @ApiResponses({
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Turnos generados correctamente"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Grupo de guardia no encontrado")
+    })
+    public ResponseEntity<ApiResponse<GenerateShiftsResponse>> generateShifts(@PathVariable UUID id) {
+        var result = shiftGenerationService.generateForGroup(id);
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 }

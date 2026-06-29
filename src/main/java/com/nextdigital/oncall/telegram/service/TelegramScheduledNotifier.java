@@ -1,9 +1,12 @@
 package com.nextdigital.oncall.telegram.service;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -78,6 +81,42 @@ public class TelegramScheduledNotifier {
                         .append(" ").append(shift.startTime().toLocalTime().withSecond(0))
                         .append(" → ").append(shift.endTime().toLocalDate())
                         .append(" ").append(shift.endTime().toLocalTime().withSecond(0)).append("\n\n");
+            }
+
+            botService.notifyGroup(group.getId(), sb.toString());
+        }
+    }
+
+    @Scheduled(cron = "0 0 8 1 * ?")
+    public void sendMonthlySummary() {
+        log.debug("Sending monthly Telegram summaries...");
+        var groups = onCallGroupRepository.findByTelegramBotEnabledTrue();
+        var today = LocalDate.now();
+        var startOfMonth = today.withDayOfMonth(1);
+        var endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).plusDays(1);
+        var offset = OffsetDateTime.now().getOffset();
+        var monthStart = startOfMonth.atStartOfDay().atOffset(offset);
+        var monthEnd = endOfMonth.atStartOfDay().atOffset(offset);
+        var monthLabel = today.format(DateTimeFormatter.ofPattern("MMMM yyyy"));
+
+        for (var group : groups) {
+            var shifts = shiftService.findAll(null, group.getId(), monthStart, monthEnd);
+            if (shifts.isEmpty()) {
+                continue;
+            }
+
+            var sb = new StringBuilder();
+            sb.append("📊 *Resumen mensual de guardias — ")
+                    .append(monthLabel).append("*\n\n");
+
+            for (var shift : shifts) {
+                sb.append("👤 *").append(shift.personName()).append("*\n");
+                sb.append("   📆 ").append(shift.startTime().toLocalDate())
+                        .append(" ").append(shift.startTime().toLocalTime().withSecond(0))
+                        .append(" → ").append(shift.endTime().toLocalDate())
+                        .append(" ").append(shift.endTime().toLocalTime().withSecond(0));
+                var h = Duration.between(shift.startTime(), shift.endTime()).toHours();
+                sb.append(" ⏱ ").append(h).append("h\n\n");
             }
 
             botService.notifyGroup(group.getId(), sb.toString());

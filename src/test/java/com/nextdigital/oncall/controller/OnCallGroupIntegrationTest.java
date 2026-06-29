@@ -27,6 +27,7 @@ import com.nextdigital.oncall.config.TestcontainersConfig;
 import com.nextdigital.oncall.dto.ApiResponse;
 import com.nextdigital.oncall.dto.ApplicationRequest;
 import com.nextdigital.oncall.dto.ApplicationResponse;
+import com.nextdigital.oncall.dto.GenerateShiftsResponse;
 import com.nextdigital.oncall.dto.OnCallGroupRequest;
 import com.nextdigital.oncall.dto.OnCallGroupResponse;
 import com.nextdigital.oncall.dto.PersonRequest;
@@ -205,5 +206,57 @@ class OnCallGroupIntegrationTest {
 
                 assertThat(response.errors()).isNotEmpty();
                 assertThat(response.errors().get(0).code()).isEqualTo("NOT_FOUND");
+        }
+
+        @Test
+        void generateShifts_returns200WithCreatedShifts() throws Exception {
+                // Create a full group with people
+                var createRequest = new OnCallGroupRequest(
+                                "AutoGen Group",
+                                new BigDecimal("100.00"),
+                                null, null, null,
+                                Set.of(appId),
+                                Set.of(personId),
+                                null, null);
+
+                var createResult = mockMvc.perform(post("/api/v1/on-call-groups")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(createRequest))
+                                .with(jwt()))
+                                .andExpect(status().isCreated())
+                                .andReturn();
+
+                var created = objectMapper.readValue(
+                                createResult.getResponse().getContentAsString(),
+                                new TypeReference<ApiResponse<OnCallGroupResponse>>() {
+                                });
+                var groupId = created.data().id();
+
+                // Trigger generation
+                var genResult = mockMvc.perform(post("/api/v1/on-call-groups/{id}/generate-shifts", groupId)
+                                .with(jwt()))
+                                .andExpect(status().isOk())
+                                .andReturn();
+
+                var genResponse = objectMapper.readValue(
+                                genResult.getResponse().getContentAsString(),
+                                new TypeReference<ApiResponse<GenerateShiftsResponse>>() {
+                                });
+
+                assertThat(genResponse.data()).isNotNull();
+                assertThat(genResponse.data().onCallGroupId()).isEqualTo(groupId);
+                assertThat(genResponse.data().shiftsCreated()).isEqualTo(4);
+                assertThat(genResponse.data().createdShifts()).hasSize(4);
+                assertThat(genResponse.data().warnings()).isEmpty();
+                assertThat(genResponse.data().coverageStart()).isNotNull();
+                assertThat(genResponse.data().coverageEnd()).isNotNull();
+                assertThat(genResponse.data().coverageEnd()).isAfter(genResponse.data().coverageStart());
+        }
+
+        @Test
+        void generateShifts_returns404WhenGroupNotFound() throws Exception {
+                mockMvc.perform(post("/api/v1/on-call-groups/{id}/generate-shifts", UUID.randomUUID())
+                                .with(jwt()))
+                                .andExpect(status().isNotFound());
         }
 }

@@ -72,3 +72,13 @@ springdoc:
   oauth:
     client-id: ${GOOGLE_CLIENT_ID:test-client-id}
     use-pkce-with-authorization-code-grant: true
+
+# Auto-generación de turnos de guardia
+oncall:
+  shift-generation:
+    enabled: true
+    margin-weeks: 2
+    coverage-weeks: 4
+    cron: "0 0 3 * * ?"
+    timezone: "Europe/Madrid"
+    lookback-days: 90
