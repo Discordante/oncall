@@ -1,12 +1,27 @@
 package com.nextdigital.oncall.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.OffsetDateTime;
-import java.util.UUID;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
 @Entity
 @Table(name = "shifts")
@@ -15,8 +30,8 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = {"onCallGroup", "person"})
-@EqualsAndHashCode(exclude = {"onCallGroup", "person", "createdAt", "updatedAt"})
+@ToString(exclude = { "onCallGroup", "person" })
+@EqualsAndHashCode(exclude = { "onCallGroup", "person", "createdAt", "updatedAt" })
 public class Shift {
 
     @Id
@@ -36,6 +51,19 @@ public class Shift {
 
     @Column(name = "end_time", nullable = false)
     private OffsetDateTime endTime;
+
+    @Column(name = "redirect_status")
+    private String redirectStatus;
+
+    @Column(name = "redirect_failed_at")
+    private OffsetDateTime redirectFailedAt;
+
+    @Column(name = "redirect_last_attempt_at")
+    private OffsetDateTime redirectLastAttemptAt;
+
+    @Column(name = "redirect_retry_count")
+    @Builder.Default
+    private int redirectRetryCount = 0;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

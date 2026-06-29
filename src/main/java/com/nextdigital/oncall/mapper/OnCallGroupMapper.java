@@ -35,6 +35,8 @@ public final class OnCallGroupMapper {
                                 applications,
                                 people,
                                 entity.getCreatedAt(),
+                                entity.getZadarmaSipId(),
+                                entity.getZadarmaRedirectionType(),
                                 entity.getUpdatedAt());
         }
 
@@ -57,7 +59,12 @@ public final class OnCallGroupMapper {
                 if (request.telegramBotEnabled() != null) {
                         group.setTelegramBotEnabled(request.telegramBotEnabled());
                 }
-
+                if (request.zadarmaSipId() != null) {
+                        group.setZadarmaSipId(request.zadarmaSipId());
+                }
+                if (request.zadarmaRedirectionType() != null) {
+                        group.setZadarmaRedirectionType(request.zadarmaRedirectionType());
+                }
                 return group;
         }
 
@@ -78,6 +85,12 @@ public final class OnCallGroupMapper {
                 }
                 if (request.telegramBotEnabled() != null) {
                         entity.setTelegramBotEnabled(request.telegramBotEnabled());
+                }
+                if (request.zadarmaSipId() != null) {
+                        entity.setZadarmaSipId(request.zadarmaSipId());
+                }
+                if (request.zadarmaRedirectionType() != null) {
+                        entity.setZadarmaRedirectionType(request.zadarmaRedirectionType());
                 }
         }
 }

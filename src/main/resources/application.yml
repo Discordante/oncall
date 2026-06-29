@@ -39,6 +39,17 @@ telegram:
     polling-interval-ms: 5000
     webhook-base-url: ${TELEGRAM_WEBHOOK_URL:}
 
+# Zadarma VoIP API integration
+zadarma:
+  api:
+    key: ${ZADARMA_API_KEY:}
+    secret: ${ZADARMA_API_SECRET:}
+    base-url: https://api.zadarma.com
+  redirect:
+    retry-max-attempts: 10
+    retry-initial-delay-seconds: 30
+    fallback-check-interval-seconds: 300
+
 # Actuator — solo exponer /health
 management:
   endpoints:

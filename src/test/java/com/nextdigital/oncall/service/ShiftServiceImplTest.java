@@ -28,6 +28,7 @@ import com.nextdigital.oncall.exception.ShiftOverlapException;
 import com.nextdigital.oncall.repository.OnCallGroupRepository;
 import com.nextdigital.oncall.repository.PersonRepository;
 import com.nextdigital.oncall.repository.ShiftRepository;
+import com.nextdigital.oncall.zadarma.scheduler.CallRedirectionScheduler;
 
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -45,6 +46,9 @@ class ShiftServiceImplTest {
 
         @Mock
         private ApplicationEventPublisher eventPublisher;
+
+        @Mock
+        private CallRedirectionScheduler redirectionScheduler;
 
         @InjectMocks
         private ShiftServiceImpl service;

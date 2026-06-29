@@ -10,6 +10,7 @@
 | [api-guidelines.md](api-guidelines.md) | Diseño REST, formatos request/response, paginación |
 | [database.md](database.md) | Convenciones de BD, Flyway, nomenclatura de esquema |
 | [telegram.md](telegram.md) | Integración con Telegram: configuración, vinculación, comandos, notificaciones |
+| [zadarma.md](zadarma.md) | Integración con Zadarma: redirección VoIP automática por turnos |
 
 ## Instrucciones para Copilot
 

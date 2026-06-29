@@ -30,6 +30,13 @@ public class GlobalExceptionHandler {
                                 .body(ApiResponse.error(ValidationError.of("SHIFT_OVERLAP", ex.getMessage())));
         }
 
+        @ExceptionHandler(ZadarmaApiException.class)
+        public ResponseEntity<ApiResponse<Void>> handleZadarmaApi(ZadarmaApiException ex) {
+                log.error("Zadarma API error: {}", ex.getMessage());
+                return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                                .body(ApiResponse.error(ValidationError.of("ZADARMA_API_ERROR", ex.getMessage())));
+        }
+
         @ExceptionHandler(IllegalArgumentException.class)
         public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException ex) {
                 return ResponseEntity.badRequest()

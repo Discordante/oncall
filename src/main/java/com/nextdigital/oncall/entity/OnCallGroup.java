@@ -45,6 +45,13 @@ public class OnCallGroup {
         @Column(name = "telegram_group_invite_link")
         private String telegramGroupInviteLink;
 
+        @Column(name = "zadarma_sip_id")
+        private String zadarmaSipId;
+
+        @Column(name = "zadarma_redirection_type")
+        @Builder.Default
+        private String zadarmaRedirectionType = "sip";
+
         @ManyToMany
         @JoinTable(name = "on_call_group_apps", joinColumns = @JoinColumn(name = "on_call_group_id"), inverseJoinColumns = @JoinColumn(name = "application_id"))
         @Builder.Default

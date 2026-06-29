@@ -8,10 +8,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentMatchers;
+import static org.mockito.ArgumentMatchers.any;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -64,7 +63,7 @@ class ScheduleCommandTest {
                 UUID.randomUUID(), groupId, "Test Group",
                 UUID.randomUUID(), "Alice", "alice@test.com",
                 now, now.plusDays(7),
-                now, now);
+                now, null, now);
 
         when(shiftService.findAll(any(), any(), any(), any()))
                 .thenReturn(List.of(shift));
@@ -83,12 +82,12 @@ class ScheduleCommandTest {
                 UUID.randomUUID(), groupId, "Test Group",
                 UUID.randomUUID(), "Alice", "alice@test.com",
                 now, now.plusDays(3),
-                now, now);
+                now, null, now);
         var shift2 = new ShiftResponse(
                 UUID.randomUUID(), groupId, "Test Group",
                 UUID.randomUUID(), "Bob", "bob@test.com",
                 now.plusDays(3), now.plusDays(7),
-                now, now);
+                now, null, now);
 
         when(shiftService.findAll(any(), any(), any(), any()))
                 .thenReturn(List.of(shift1, shift2));

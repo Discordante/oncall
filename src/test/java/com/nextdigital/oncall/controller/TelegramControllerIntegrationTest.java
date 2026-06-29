@@ -196,7 +196,8 @@ class TelegramControllerIntegrationTest {
                                 "-1001234567890",
                                 true,
                                 Set.of(),
-                                Set.of());
+                                Set.of(),
+                                null, null);
 
                 var result = mockMvc.perform(post("/api/v1/on-call-groups")
                                 .contentType(MediaType.APPLICATION_JSON)

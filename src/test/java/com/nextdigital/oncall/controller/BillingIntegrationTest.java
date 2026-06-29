@@ -103,7 +103,7 @@ class BillingIntegrationTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(
                                                 new OnCallGroupRequest("SRE OnCall", new java.math.BigDecimal("100.00"),
-                                                                null, null, null, null, null)))
+                                                                null, null, null, null, null, null, null)))
                                 .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();

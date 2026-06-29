@@ -22,6 +22,7 @@ public final class ShiftMapper {
                 entity.getStartTime(),
                 entity.getEndTime(),
                 entity.getCreatedAt(),
+                entity.getRedirectStatus(),
                 entity.getUpdatedAt());
     }
 

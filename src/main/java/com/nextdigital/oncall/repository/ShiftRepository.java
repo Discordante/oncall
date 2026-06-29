@@ -54,4 +54,25 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
 
         List<Shift> findByOnCallGroupIdAndPersonIdAndStartTimeBetweenOrderByStartTimeAsc(
                         UUID onCallGroupId, UUID personId, OffsetDateTime startTime, OffsetDateTime endTime);
+
+        @Query("SELECT s FROM Shift s JOIN FETCH s.onCallGroup JOIN FETCH s.person " +
+                        "WHERE s.startTime <= :now AND s.endTime > :now")
+        List<Shift> findCurrentlyActive(@Param("now") OffsetDateTime now);
+
+        @Query("SELECT s FROM Shift s JOIN FETCH s.onCallGroup JOIN FETCH s.person " +
+                        "WHERE s.endTime > :now")
+        List<Shift> findAllActiveAndFuture(@Param("now") OffsetDateTime now);
+
+        @Query("SELECT s FROM Shift s JOIN FETCH s.onCallGroup JOIN FETCH s.person " +
+                        "WHERE s.onCallGroup.id = :groupId " +
+                        "AND s.startTime >= :after " +
+                        "ORDER BY s.startTime ASC")
+        List<Shift> findNextShiftsForGroup(
+                        @Param("groupId") UUID groupId,
+                        @Param("after") OffsetDateTime after);
+
+        List<Shift> findByOnCallGroupIdAndEndTimeGreaterThanOrderByStartTimeAsc(
+                        UUID onCallGroupId, OffsetDateTime now);
+
+        List<Shift> findByRedirectStatus(String redirectStatus);
 }

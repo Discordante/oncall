@@ -24,6 +24,7 @@ import com.nextdigital.oncall.repository.ShiftRepository;
 import com.nextdigital.oncall.telegram.event.ShiftCreatedEvent;
 import com.nextdigital.oncall.telegram.event.ShiftDeletedEvent;
 import com.nextdigital.oncall.telegram.event.ShiftUpdatedEvent;
+import com.nextdigital.oncall.zadarma.scheduler.CallRedirectionScheduler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +38,7 @@ public class ShiftServiceImpl implements ShiftService {
     private final OnCallGroupRepository onCallGroupRepository;
     private final PersonRepository personRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final CallRedirectionScheduler redirectionScheduler;
 
     @Override
     @Transactional(readOnly = true)
@@ -104,7 +106,10 @@ public class ShiftServiceImpl implements ShiftService {
         log.info("Shift created: {} for person {} in group {}",
                 saved.getId(), request.personId(), request.onCallGroupId());
 
-        // 4. Publish event for Telegram notification
+        // 4. Schedule Zadarma call redirection transitions
+        redirectionScheduler.scheduleShiftTransitions(saved);
+
+        // 5. Publish event for Telegram notification
         eventPublisher.publishEvent(new ShiftCreatedEvent(
                 saved.getId(), saved.getOnCallGroup().getId(), saved.getPerson().getId(),
                 saved.getPerson().getName(), saved.getOnCallGroup().getName(),
@@ -140,7 +145,11 @@ public class ShiftServiceImpl implements ShiftService {
         log.info("Shift updated: {} for person {}",
                 saved.getId(), request.personId());
 
-        // 4. Publish event for Telegram notification
+        // 4. Reschedule Zadarma call redirection transitions
+        redirectionScheduler.cancelShiftTransitions(saved.getId());
+        redirectionScheduler.scheduleShiftTransitions(saved);
+
+        // 5. Publish event for Telegram notification
         eventPublisher.publishEvent(new ShiftUpdatedEvent(
                 saved.getId(), saved.getOnCallGroup().getId(), saved.getPerson().getId(),
                 saved.getPerson().getName(), saved.getOnCallGroup().getName(),
@@ -162,8 +171,17 @@ public class ShiftServiceImpl implements ShiftService {
         var startTime = entity.getStartTime();
         var endTime = entity.getEndTime();
 
+        var now = java.time.OffsetDateTime.now();
+        boolean wasActive = !startTime.isAfter(now) && endTime.isAfter(now);
+
         repository.delete(entity);
         log.info("Shift deleted: {}", id);
+
+        // Cancel any scheduled Zadarma transitions
+        redirectionScheduler.cancelShiftTransitions(id);
+        if (wasActive) {
+            redirectionScheduler.handleActiveShiftRemoved(groupId);
+        }
 
         eventPublisher.publishEvent(new ShiftDeletedEvent(
                 id, groupId, personId, personName, groupName,

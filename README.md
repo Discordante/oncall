@@ -39,7 +39,9 @@ src/main/java/com/nextdigital/oncall/
 ├── exception/       → Global exception handlers
 ├── mapper/          → Entity ↔ DTO converters
 ├── repository/      → Spring Data JPA repositories
-└── service/         → Business logic (interface + impl)
+├── service/         → Business logic (interface + impl)
+├── telegram/        → Integración Telegram (bot, comandos, notificaciones)
+└── zadarma/         → Integración Zadarma (redirección VoIP, scheduler)
 
 src/main/resources/
 ├── application.yml           → Configuración base
@@ -132,6 +134,10 @@ Hibernate opera con `ddl-auto=validate`: el esquema lo gestiona exclusivamente F
 
 > **V2**: La migración `V2__add_on_call_group_price_history.sql` añade la tabla de historial de precios
 > y migra automáticamente los precios actuales de cada grupo como su primer registro histórico.
+>
+> **V3**: Integración Telegram — columnas en `people` y `on_call_groups`, tabla `telegram_pending_links`.
+>
+> **V6**: Integración Zadarma — `zadarma_sip_id` y `zadarma_redirection_type` en `on_call_groups`; `redirect_status` y trazabilidad de reintentos en `shifts`.
 
 ---
 
@@ -233,6 +239,41 @@ Base URL: `/api/v1/`
 - Si se extiende el turno → el siguiente turno de la misma persona se acorta
 - Si se acorta el turno → el siguiente turno se extiende para rellenar el hueco
 - Si se mueve el inicio → el turno anterior se ajusta análogamente
+
+### Zadarma — Redirección de llamadas VoIP
+
+> 📚 Documentación completa: [docs/zadarma.md](docs/zadarma.md)
+
+Al crear un turno, el sistema programa automáticamente la redirección de llamadas al teléfono de la persona cuando llegue la hora de inicio. Si la redirección falla, se reintenta con backoff y se alerta por Telegram.
+
+**Solo se necesita 1 llamada a la API de Zadarma** (`PUT /v1/sip/redirection/`), no el antiguo flujo de 3 llamadas.
+
+| Fase | Comportamiento |
+|---|---|
+| Crear turno futuro | Se guarda en BD, se programa la redirección para la hora de inicio. No se llama a Zadarma todavía. |
+| Hora de inicio | El scheduler ejecuta `PUT /v1/sip/redirection/` → el grupo redirige al teléfono de la persona. |
+| Hora de fin | Busca el siguiente turno activo y redirige a esa persona, o desactiva la redirección si no hay nadie. |
+| Fallo de API | El turno se marca como `failed`, se preserva la redirección anterior, se reintenta con backoff (30s → 60s → ... ×10), se alerta por Telegram. |
+| Reinicio del servidor | Recupera todos los turnos activos/futuros de la BD y reprograma sus transiciones. |
+| Fallback (cada 5 min) | Verifica que todos los turnos activos tengan la redirección correcta; corrige desviaciones. |
+
+**Configuración:**
+```bash
+export ZADARMA_API_KEY=your_key
+export ZADARMA_API_SECRET=your_secret
+```
+
+Para que un grupo use redirección, asignarle `zadarmaSipId`:
+```json
+POST /api/v1/on-call-groups
+{ "name": "Crew OnCall", "zadarmaSipId": "921495", "zadarmaRedirectionType": "sip" }
+```
+
+**Columnas en BD:**
+- `on_call_groups.zadarma_sip_id` — ID del SIP en Zadarma (null = sin redirección)
+- `on_call_groups.zadarma_redirection_type` — `sip` (por defecto) o `pbx` (futuro)
+- `shifts.redirect_status` — `null` (pendiente), `ok`, `failed`
+- `shifts.redirect_failed_at`, `redirect_last_attempt_at`, `redirect_retry_count` — trazabilidad de reintentos
 
 ### Documentación interactiva (Swagger / OpenAPI)
 
