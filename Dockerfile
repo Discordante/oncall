@@ -1,19 +1,22 @@
 # ============================================================
 # Stage 1 — Build
 # ============================================================
-FROM maven:3.9-eclipse-temurin-25 AS build
+FROM eclipse-temurin:25-jdk AS build
 
 WORKDIR /app
 
-# Copy POM first to leverage Docker layer caching
-COPY pom.xml ./
+# Copiar el wrapper y el pom.xml primero para aprovechar el caché
+COPY mvnw .
 COPY .mvn .mvn
-COPY mvnw ./
+COPY pom.xml .
 
-# Download dependencies (cached unless pom.xml changes)
+# Asegurar permisos de ejecución para el wrapper
+RUN chmod +x ./mvnw
+
+# Descargar dependencias (se cachea a menos que pom.xml cambie)
 RUN ./mvnw dependency:go-offline -B
 
-# Copy source and build
+# Copiar el código fuente y compilar
 COPY src src
 RUN ./mvnw clean package -DskipTests -B
 
@@ -24,8 +27,15 @@ FROM eclipse-temurin:25-jre
 
 WORKDIR /app
 
-# Copy only the built JAR from the build stage
+# Crear un usuario y grupo sin privilegios por seguridad
+RUN groupadd -r springgroup && useradd -r -g springgroup springuser
+
+# Copiar el JAR desde la fase de compilación
 COPY --from=build /app/target/*.jar app.jar
+
+# Cambiar el propietario del JAR al nuevo usuario y usar ese usuario
+RUN chown springuser:springgroup app.jar
+USER springuser
 
 EXPOSE 8080
 

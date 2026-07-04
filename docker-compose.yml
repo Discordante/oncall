@@ -14,5 +14,21 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  backend:
+    build: 
+      context: . # Busca el Dockerfile en la misma carpeta
+    container_name: oncall-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080" # Expone el puerto de Spring Boot
+    depends_on:
+      - postgres # Espera a que la BD arranque primero
+    environment:
+      # Sobrescribe tu application.properties para usar el contenedor de Postgres
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/oncall
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=postgres
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update # O 'validate' para producción
+
 volumes:
   pgdata:
