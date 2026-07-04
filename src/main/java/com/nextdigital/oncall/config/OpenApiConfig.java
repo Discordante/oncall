@@ -14,10 +14,15 @@ import io.swagger.v3.oas.models.security.Scopes;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
-import java.util.List;
 
 @Configuration
 public class OpenApiConfig {
+
+        private final OpenApiServerProperties serverProperties;
+
+        public OpenApiConfig(OpenApiServerProperties serverProperties) {
+                this.serverProperties = serverProperties;
+        }
 
         @Bean
         public OpenAPI customOpenAPI() {
@@ -34,13 +39,9 @@ public class OpenApiConfig {
                                                 .license(new License()
                                                                 .name("Apache 2.0")
                                                                 .url("https://www.apache.org/licenses/LICENSE-2.0")))
-                                .servers(List.of(
-                                                new Server()
-                                                                .url("http://localhost:8080")
-                                                                .description("Servidor de desarrollo local"),
-                                                new Server()
-                                                                .url("https://api.oncall.nextdigital.com")
-                                                                .description("Servidor de producción")))
+                                .servers(serverProperties.getServers().stream()
+                                                .map(s -> new Server().url(s.getUrl()).description(s.getDescription()))
+                                                .toList())
                                 .components(new Components()
                                                 .addSecuritySchemes("google-oauth2",
                                                                 new SecurityScheme()
