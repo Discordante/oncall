@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class CustomOAuth2UserService implements OAuth2UserService<OidcUserRequest, OidcUser> {
 
-    private static final String ALLOWED_DOMAIN = "@nextdigital.com";
+    private static final String ALLOWED_DOMAIN = "@nextdigital.es";
 
     private final OidcUserService delegate = new OidcUserService();
 

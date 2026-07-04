@@ -74,7 +74,7 @@ openapi:
   servers:
     - url: "http://localhost:8080"
       description: "Servidor de desarrollo local"
-    - url: "https://api.oncall.nextdigital.com"
+    - url: "https://api.oncall.nextdigital.es"
       description: "Servidor de producción"
     - url: "https://oncall-production-9337.up.railway.app"
       description: "Servidor en Railway (producción)"

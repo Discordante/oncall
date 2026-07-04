@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class GoogleTokenValidator implements OAuth2TokenValidator<Jwt> {
 
-    private static final String ALLOWED_DOMAIN = "@nextdigital.com";
+    private static final String ALLOWED_DOMAIN = "@nextdigital.es";
 
     private final String expectedAudience;
 
