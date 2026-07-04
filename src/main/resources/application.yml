@@ -27,10 +27,21 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: https://accounts.google.com
+      # OAuth2 Client — Google login (proxied for the frontend SPA)
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: openid, profile, email
 
 # Google OAuth2 Client ID (from Google Cloud Console)
 google:
   client-id: ${GOOGLE_CLIENT_ID:test-client-id}
+
+# Frontend application URL (redirect target after OAuth2 login)
+app:
+  frontend-url: ${APP_FRONTEND_URL:http://localhost:5173}
 
 # Telegram bot integration
 telegram:

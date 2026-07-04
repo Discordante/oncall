@@ -13,6 +13,19 @@ spring:
 google:
   client-id: 540224367088-i5cse7n43j5bbnj7nrmk36c1caqh1juu.apps.googleusercontent.com
 
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: 540224367088-i5cse7n43j5bbnj7nrmk36c1caqh1juu.apps.googleusercontent.com
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            redirect-uri: "http://localhost:8080/login/oauth2/code/google"
+
+app:
+  frontend-url: http://localhost:5173
+
 springdoc:
   swagger-ui:
     oauth:
