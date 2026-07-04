@@ -104,6 +104,33 @@ Si no se especifica ningún perfil, solo se carga `application.yml` (útil para 
 
 ---
 
+## Variables de entorno
+
+| Variable | Perfil | Obligatoria | Default | Descripción |
+|---|---|---|---|---|
+| `SPRING_PROFILES_ACTIVE` | — | No | — | Perfil activo de Spring (`dev`, `prod`) |
+| `DB_URL` | `dev` | No | `jdbc:postgresql://localhost:5432/oncall` | URL de conexión a PostgreSQL |
+| `DB_URL` | `prod` | **Sí** | — | URL de conexión a PostgreSQL |
+| `DB_USER` | `dev` | No | `postgres` | Usuario de base de datos |
+| `DB_USER` | `prod` | **Sí** | — | Usuario de base de datos |
+| `DB_PASSWORD` | `dev` | No | `postgres` | Contraseña de base de datos |
+| `DB_PASSWORD` | `prod` | **Sí** | — | Contraseña de base de datos |
+| `GOOGLE_CLIENT_ID` | todos | No | `test-client-id` | Client ID de Google OAuth 2.0 (consola GCP) |
+| `GOOGLE_CLIENT_SECRET` | `dev` | **Sí** (Swagger UI OAuth) | — | Client Secret de Google OAuth 2.0 (consola GCP) |
+| `TELEGRAM_WEBHOOK_URL` | todos | No | — | URL base del webhook de Telegram (opcional, si se usa webhook en vez de polling) |
+| `ZADARMA_API_KEY` | todos | No | — | API key de Zadarma (para redirección VoIP) |
+| `ZADARMA_API_SECRET` | todos | No | — | API secret de Zadarma (para redirección VoIP) |
+
+### Notas
+
+- **Perfil `dev`**: todas las variables de base de datos tienen valores por defecto para desarrollo local. Las variables `GOOGLE_CLIENT_ID`, `ZADARMA_API_KEY`, `ZADARMA_API_SECRET` y `TELEGRAM_WEBHOOK_URL` son opcionales según las funcionalidades que se quieran probar.
+- **Perfil `prod`**: las variables de base de datos (`DB_URL`, `DB_USER`, `DB_PASSWORD`) **no tienen fallback** y deben definirse obligatoriamente.
+- **Google OAuth2**: `GOOGLE_CLIENT_ID` se utiliza tanto para la validación de JWT en el resource server como para la configuración OAuth2 de Swagger UI. En el perfil `dev` se usa un client-id real de desarrollo; en producción debe reemplazarse por el de la aplicación desplegada.
+- **Telegram**: el token del bot se configura por grupo de guardia (campo `telegramBotToken` en la entidad `OnCallGroup`), no como variable de entorno global. `TELEGRAM_WEBHOOK_URL` solo es necesaria si se utiliza el modo webhook en lugar del polling (por defecto se usa polling).
+- **Zadarma**: si no se configuran `ZADARMA_API_KEY` y `ZADARMA_API_SECRET`, la redirección VoIP simplemente queda deshabilitada.
+
+---
+
 ## Base de datos
 
 ### Migraciones Flyway
