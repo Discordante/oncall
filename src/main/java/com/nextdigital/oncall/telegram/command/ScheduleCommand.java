@@ -32,14 +32,14 @@ public class ScheduleCommand implements TelegramCommand {
         }
 
         var sb = new StringBuilder();
-        sb.append("📅 *Guardias — Próximas 4 semanas*\n\n");
+        sb.append("📅 <b>Guardias — Próximas 4 semanas</b>\n\n");
 
         for (var shift : shifts) {
             var start = shift.startTime();
             var end = shift.endTime();
             var personName = shift.personName();
 
-            sb.append("👤 *").append(personName).append("*\n");
+            sb.append("👤 <b>").append(personName).append("</b>\n");
             sb.append("   📆 ").append(formatDateTime(start)).append(" → ").append(formatDateTime(end)).append("\n");
             sb.append("   ⏱ ").append(durationHours(start, end)).append("h\n\n");
         }

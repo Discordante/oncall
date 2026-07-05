@@ -230,12 +230,12 @@ public class TelegramBotServiceImpl implements TelegramBotService {
         pendingLinkRepository.save(pendingLink);
 
         var welcomeMessage = """
-                🤖 *Bienvenido al bot de Oncall*
+                🤖 <b>Bienvenido al bot de Oncall</b>
 
                 Para vincular tu cuenta de Telegram con tu perfil de Oncall:
 
                 1. Copia este código de verificación:
-                `%s`
+                <code>%s</code>
 
                 2. Ve a la aplicación web de Oncall, a tu perfil, e ingresa el código.
 

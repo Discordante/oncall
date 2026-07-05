@@ -4,9 +4,6 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -46,11 +43,11 @@ public class TelegramScheduledNotifier {
             }
 
             var sb = new StringBuilder();
-            sb.append("☀️ *Resumen del día* — ").append(today.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+            sb.append("☀️ <b>Resumen del día</b> — ").append(today.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
                     .append("\n\n");
 
             for (var shift : shifts) {
-                sb.append("👤 *").append(shift.personName()).append("*\n");
+                sb.append("👤 <b>").append(shift.personName()).append("</b>\n");
                 sb.append("   📆 ").append(shift.startTime().toLocalTime().withSecond(0))
                         .append(" → ").append(shift.endTime().toLocalTime().withSecond(0)).append("\n\n");
             }
@@ -73,10 +70,10 @@ public class TelegramScheduledNotifier {
             }
 
             var sb = new StringBuilder();
-            sb.append("📅 *Resumen semanal de guardias*\n\n");
+            sb.append("📅 <b>Resumen semanal de guardias</b>\n\n");
 
             for (var shift : shifts) {
-                sb.append("👤 *").append(shift.personName()).append("*\n");
+                sb.append("👤 <b>").append(shift.personName()).append("</b>\n");
                 sb.append("   📆 ").append(shift.startTime().toLocalDate())
                         .append(" ").append(shift.startTime().toLocalTime().withSecond(0))
                         .append(" → ").append(shift.endTime().toLocalDate())
@@ -106,11 +103,11 @@ public class TelegramScheduledNotifier {
             }
 
             var sb = new StringBuilder();
-            sb.append("📊 *Resumen mensual de guardias — ")
-                    .append(monthLabel).append("*\n\n");
+            sb.append("📊 <b>Resumen mensual de guardias — ")
+                    .append(monthLabel).append("</b>\n\n");
 
             for (var shift : shifts) {
-                sb.append("👤 *").append(shift.personName()).append("*\n");
+                sb.append("👤 <b>").append(shift.personName()).append("</b>\n");
                 sb.append("   📆 ").append(shift.startTime().toLocalDate())
                         .append(" ").append(shift.startTime().toLocalTime().withSecond(0))
                         .append(" → ").append(shift.endTime().toLocalDate())

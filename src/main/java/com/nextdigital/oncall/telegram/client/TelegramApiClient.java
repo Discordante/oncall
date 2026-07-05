@@ -23,7 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 public class TelegramApiClient {
 
     private static final String API_BASE = "https://api.telegram.org";
-    private static final String PARSE_MODE_MARKDOWN = "MarkdownV2";
+    private static final String PARSE_MODE_HTML = "HTML";
 
     private final RestClient restClient;
 
@@ -34,15 +34,15 @@ public class TelegramApiClient {
     }
 
     /**
-     * Sends a text message to a Telegram chat using MarkdownV2 formatting.
+     * Sends a text message to a Telegram chat using HTML formatting.
      *
      * @param botToken the bot token
      * @param chatId   the target chat ID
-     * @param text     the message text (MarkdownV2 formatted)
+     * @param text     the message text (HTML formatted)
      * @return true if the message was sent successfully
      */
     public boolean sendMessage(String botToken, String chatId, String text) {
-        return sendMessage(botToken, chatId, text, PARSE_MODE_MARKDOWN);
+        return sendMessage(botToken, chatId, text, PARSE_MODE_HTML);
     }
 
     /**
@@ -51,7 +51,7 @@ public class TelegramApiClient {
      * @param botToken  the bot token
      * @param chatId    the target chat ID
      * @param text      the message text
-     * @param parseMode parse mode (HTML, MarkdownV2, or null for plain text)
+     * @param parseMode parse mode (HTML, or null for plain text)
      * @return true if the message was sent successfully
      */
     public boolean sendMessage(String botToken, String chatId, String text, String parseMode) {
