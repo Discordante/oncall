@@ -51,7 +51,7 @@ public class TelegramApiClient {
      * @param botToken  the bot token
      * @param chatId    the target chat ID
      * @param text      the message text
-     * @param parseMode parse mode (HTML, MarkdownV2, or null for plain text)
+     * @param parseMode parse mode (HTML, or null for plain text)
      * @return true if the message was sent successfully
      */
     public boolean sendMessage(String botToken, String chatId, String text, String parseMode) {
