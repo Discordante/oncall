@@ -33,7 +33,6 @@ public class CommandRouter {
     @PostConstruct
     void registerHandlers() {
         handlers.put("/info", infoCommand);
-        handlers.put("/start", infoCommand); // /start is handled separately in the bot service
         handlers.put("/turnos", scheduleCommand);
         log.info("Registered {} command handlers", handlers.size());
     }
