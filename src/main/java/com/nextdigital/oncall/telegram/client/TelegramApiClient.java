@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class TelegramApiClient {
 
-    private static final String API_BASE = "https://api.telegram.org/bot";
+    private static final String API_BASE = "https://api.telegram.org";
     private static final String PARSE_MODE_MARKDOWN = "MarkdownV2";
 
     private final RestClient restClient;
@@ -57,7 +57,7 @@ public class TelegramApiClient {
         try {
             var payload = new SendMessagePayload(chatId, text, parseMode);
             var response = restClient.post()
-                    .uri("/{token}/sendMessage", botToken)
+                    .uri("/bot{token}/sendMessage", botToken)
                     .body(payload)
                     .retrieve()
                     .body(TelegramResponse.class);
@@ -86,7 +86,7 @@ public class TelegramApiClient {
     public boolean setWebhook(String botToken, String url) {
         try {
             var response = restClient.post()
-                    .uri("/{token}/setWebhook?url={url}", botToken, url)
+                    .uri("/bot{token}/setWebhook?url={url}", botToken, url)
                     .retrieve()
                     .body(TelegramResponse.class);
 
@@ -112,7 +112,7 @@ public class TelegramApiClient {
     public boolean deleteWebhook(String botToken) {
         try {
             var response = restClient.post()
-                    .uri("/{token}/deleteWebhook", botToken)
+                    .uri("/bot{token}/deleteWebhook", botToken)
                     .retrieve()
                     .body(TelegramResponse.class);
 
@@ -142,7 +142,7 @@ public class TelegramApiClient {
         try {
             var response = restClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .path("/{token}/getUpdates")
+                            .path("/bot{token}/getUpdates")
                             .queryParam("offset", offset)
                             .queryParam("timeout", timeout)
                             .build(botToken))
@@ -171,7 +171,7 @@ public class TelegramApiClient {
     public String createChatInviteLink(String botToken, String chatId) {
         try {
             var response = restClient.post()
-                    .uri("/{token}/createChatInviteLink?chat_id={chatId}",
+                    .uri("/bot{token}/createChatInviteLink?chat_id={chatId}",
                             botToken, chatId)
                     .retrieve()
                     .body(JsonNode.class);
@@ -203,7 +203,7 @@ public class TelegramApiClient {
     public boolean verifyBotInGroup(String botToken, String chatId) {
         try {
             var response = restClient.post()
-                    .uri("/{token}/sendChatAction?chat_id={chatId}&action=typing",
+                    .uri("/bot{token}/sendChatAction?chat_id={chatId}&action=typing",
                             botToken, chatId)
                     .retrieve()
                     .body(TelegramResponse.class);
