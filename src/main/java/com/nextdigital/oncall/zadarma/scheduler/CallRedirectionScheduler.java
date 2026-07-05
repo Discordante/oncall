@@ -93,9 +93,13 @@ public class CallRedirectionScheduler {
             scheduledTasks.put(shift.getId(), startFuture);
             log.debug("Scheduled start redirect for shift {} at {}", shift.getId(), shift.getStartTime());
         } else if (isActive(shift, now)) {
-            // Shift is already active → redirect immediately
-            log.debug("Shift {} is already active — triggering immediate redirect", shift.getId());
-            redirectToOnCallPerson(shift.getId());
+            // Shift is already active → schedule redirect with a short delay
+            // to avoid blocking the caller (e.g. during startup recovery)
+            log.debug("Shift {} is already active — scheduling redirect in 2s", shift.getId());
+            ScheduledFuture<?> startFuture = taskScheduler.schedule(
+                    () -> self.redirectToOnCallPerson(shift.getId()),
+                    Instant.now().plusSeconds(2));
+            scheduledTasks.put(shift.getId(), startFuture);
         }
 
         // Schedule the END transition
@@ -157,6 +161,14 @@ public class CallRedirectionScheduler {
         // If shift has already ended, don't redirect
         if (!shift.getEndTime().isAfter(now)) {
             log.debug("Shift {} has ended — skipping redirect", shiftId);
+            return;
+        }
+
+        // If the group doesn't use Zadarma (no sipId), skip silently
+        String sipId = shift.getOnCallGroup().getZadarmaSipId();
+        if (sipId == null || sipId.isBlank()) {
+            log.debug("Group '{}' has no zadarmaSipId — skipping redirect for shift {}",
+                    shift.getOnCallGroup().getName(), shiftId);
             return;
         }
 
@@ -267,11 +279,6 @@ public class CallRedirectionScheduler {
         for (var shift : allFutureShifts) {
             if (isActive(shift, now)) {
                 activeCount++;
-                // Schedule immediate redirect in a separate thread to avoid blocking startup.
-                // Use self (proxy) to ensure @Transactional is applied.
-                taskScheduler.schedule(
-                        () -> self.redirectToOnCallPerson(shift.getId()),
-                        Instant.now().plusSeconds(2));
             } else {
                 futureCount++;
             }
@@ -304,6 +311,12 @@ public class CallRedirectionScheduler {
         log.debug("Fallback check: verifying {} active shifts", activeShifts.size());
 
         for (var shift : activeShifts) {
+            // Skip groups that don't use Zadarma
+            String sipId = shift.getOnCallGroup().getZadarmaSipId();
+            if (sipId == null || sipId.isBlank()) {
+                continue;
+            }
+
             try {
                 var currentDest = zadarmaService.getCurrentRedirectionDestination(
                         shift.getOnCallGroup().getId());
