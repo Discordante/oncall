@@ -33,6 +33,7 @@ public final class OnCallGroupMapper {
                                 entity.getName(),
                                 entity.getGrossPricePerDay(),
                                 config != null ? config.getGroupChatId() : null,
+                                config != null ? config.getBotToken() : null,
                                 config != null && config.getBotEnabled() != null && config.getBotEnabled(),
                                 config != null ? config.getGroupInviteLink() : null,
                                 applications,
