@@ -17,51 +17,51 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class ZadarmaRedirectAlertListener {
 
-    private final TelegramBotServiceImpl botService;
+        private final TelegramBotServiceImpl botService;
 
-    @EventListener
-    public void onRedirectSuccess(ZadarmaRedirectSuccessEvent event) {
-        log.info("Zadarma redirect OK: shift {} → {} (group '{}')",
-                event.shiftId(), event.personName(), event.groupName());
+        @EventListener
+        public void onRedirectSuccess(ZadarmaRedirectSuccessEvent event) {
+                log.info("Zadarma redirect OK: shift {} → {} (group '{}')",
+                                event.shiftId(), event.personName(), event.groupName());
 
-        var message = """
-                📞 *Oncall redirigido a %s*
+                var message = """
+                                📞 <b>Oncall redirigido a %s</b>
 
-                📋 Grupo: *%s*
-                📱 Teléfono: `%s`
-                📆 Desde: %s
-                📆 Hasta: %s
-                """.formatted(
-                event.personName(),
-                event.groupName(),
-                event.phoneMasked(),
-                event.startTimeFormatted(),
-                event.endTimeFormatted());
+                                📋 Grupo: <b>%s</b>
+                                📱 Teléfono: <code>%s</code>
+                                📆 Desde: %s
+                                📆 Hasta: %s
+                                """.formatted(
+                                event.personName(),
+                                event.groupName(),
+                                event.phoneMasked(),
+                                event.startTimeFormatted(),
+                                event.endTimeFormatted());
 
-        botService.notifyGroup(event.groupId(), message);
-    }
+                botService.notifyGroup(event.groupId(), message);
+        }
 
-    @EventListener
-    public void onRedirectFailed(ZadarmaRedirectFailedEvent event) {
-        log.warn("Zadarma redirect failed for shift {}: {} (retry {}/{})",
-                event.shiftId(), event.errorMessage(), event.retryCount(), event.maxRetries());
+        @EventListener
+        public void onRedirectFailed(ZadarmaRedirectFailedEvent event) {
+                log.warn("Zadarma redirect failed for shift {}: {} (retry {}/{})",
+                                event.shiftId(), event.errorMessage(), event.retryCount(), event.maxRetries());
 
-        var message = """
-                ⚠️ *Fallo en la redirección de llamadas*
+                var message = """
+                                ⚠️ <b>Fallo en la redirección de llamadas</b>
 
-                📋 Grupo: *%s*
-                👤 Persona de guardia: *%s*
-                📞 Teléfono: `%s`
-                ❌ Error: %s
-                🔄 Reintento: %d/%d
-                """.formatted(
-                event.groupName(),
-                event.personName(),
-                event.phoneNumber() != null ? event.phoneNumber() : "N/A",
-                event.errorMessage(),
-                event.retryCount(),
-                event.maxRetries());
+                                📋 Grupo: <b>%s</b>
+                                👤 Persona de guardia: <b>%s</b>
+                                📞 Teléfono: <code>%s</code>
+                                ❌ Error: %s
+                                🔄 Reintento: %d/%d
+                                """.formatted(
+                                event.groupName(),
+                                event.personName(),
+                                event.phoneNumber() != null ? event.phoneNumber() : "N/A",
+                                event.errorMessage(),
+                                event.retryCount(),
+                                event.maxRetries());
 
-        botService.notifyGroup(event.groupId(), message);
-    }
+                botService.notifyGroup(event.groupId(), message);
+        }
 }

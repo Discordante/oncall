@@ -29,9 +29,9 @@ public class ShiftNotificationListener {
         log.debug("Shift created event: {}", event.shiftId());
 
         var groupMsg = """
-                🆕 *Nueva guardia asignada*
+                🆕 <b>Nueva guardia asignada</b>
 
-                👤 *%s*
+                👤 <b>%s</b>
                 📆 %s → %s
                 ⏱ %d h
                 """.formatted(
@@ -43,9 +43,9 @@ public class ShiftNotificationListener {
         botService.notifyGroup(event.groupId(), groupMsg);
 
         var personMsg = """
-                🆕 *Se te ha asignado una nueva guardia*
+                🆕 <b>Se te ha asignado una nueva guardia</b>
 
-                📋 Grupo: *%s*
+                📋 Grupo: <b>%s</b>
                 📆 %s → %s
                 ⏱ %d h
                 """.formatted(
@@ -62,9 +62,9 @@ public class ShiftNotificationListener {
         log.debug("Shift updated event: {}", event.shiftId());
 
         var groupMsg = """
-                🔄 *Guardia modificada*
+                🔄 <b>Guardia modificada</b>
 
-                👤 *%s*
+                👤 <b>%s</b>
                 📆 Anterior: %s → %s
                 📆 Nueva: %s → %s
                 """.formatted(
@@ -77,9 +77,9 @@ public class ShiftNotificationListener {
         botService.notifyGroup(event.groupId(), groupMsg);
 
         var personMsg = """
-                🔄 *Tu guardia ha sido modificada*
+                🔄 <b>Tu guardia ha sido modificada</b>
 
-                📋 Grupo: *%s*
+                📋 Grupo: <b>%s</b>
                 📆 Anterior: %s → %s
                 📆 Nueva: %s → %s
                 """.formatted(
@@ -97,9 +97,9 @@ public class ShiftNotificationListener {
         log.debug("Shift deleted event: {}", event.shiftId());
 
         var groupMsg = """
-                ❌ *Guardia cancelada*
+                ❌ <b>Guardia cancelada</b>
 
-                👤 *%s*
+                👤 <b>%s</b>
                 📆 %s → %s
                 """.formatted(
                 event.personName(),
@@ -109,9 +109,9 @@ public class ShiftNotificationListener {
         botService.notifyGroup(event.groupId(), groupMsg);
 
         var personMsg = """
-                ❌ *Tu guardia ha sido cancelada*
+                ❌ <b>Tu guardia ha sido cancelada</b>
 
-                📋 Grupo: *%s*
+                📋 Grupo: <b>%s</b>
                 📆 %s → %s
                 """.formatted(
                 event.groupName(),
