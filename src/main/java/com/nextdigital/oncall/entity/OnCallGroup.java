@@ -1,15 +1,33 @@
 package com.nextdigital.oncall.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
 @Entity
 @Table(name = "on_call_groups")
@@ -32,18 +50,9 @@ public class OnCallGroup {
         @Column(name = "gross_price_per_day", precision = 10, scale = 2)
         private BigDecimal grossPricePerDay;
 
-        @Column(name = "telegram_bot_token")
-        private String telegramBotToken;
-
-        @Column(name = "telegram_group_chat_id")
-        private String telegramGroupChatId;
-
-        @Column(name = "telegram_bot_enabled", nullable = false)
-        @Builder.Default
-        private Boolean telegramBotEnabled = false;
-
-        @Column(name = "telegram_group_invite_link")
-        private String telegramGroupInviteLink;
+        @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
+        @JoinColumn(name = "telegram_group_config_id", referencedColumnName = "id")
+        private TelegramGroupConfig telegramGroupConfig;
 
         @Column(name = "zadarma_sip_id")
         private String zadarmaSipId;

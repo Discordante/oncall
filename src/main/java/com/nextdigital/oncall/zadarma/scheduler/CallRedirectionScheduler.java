@@ -2,15 +2,15 @@ package com.nextdigital.oncall.zadarma.scheduler;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -54,6 +54,16 @@ public class CallRedirectionScheduler {
     private final ShiftRepository shiftRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final ZadarmaConfig config;
+
+    /**
+     * Self-reference to ensure {@link #redirectToOnCallPerson} is called
+     * through the Spring AOP proxy so that {@code @Transactional} is applied.
+     * Required because {@link TaskScheduler#schedule} lambdas capture
+     * {@code this} (the raw instance), bypassing the proxy.
+     */
+    @Lazy
+    @Autowired
+    private CallRedirectionScheduler self;
 
     /**
      * Maps shiftId → {startTask, endTask} futures for cancellation on
@@ -222,12 +232,13 @@ public class CallRedirectionScheduler {
                 maxRetries,
                 OffsetDateTime.now()));
 
-        // Schedule retry with increasing delay
+        // Schedule retry with increasing delay.
+        // Use self (proxy) to ensure @Transactional is applied.
         if (retryCount < maxRetries) {
             long delaySeconds = (long) initialDelay * (retryCount + 1);
             log.info("Scheduling retry for shift {} in {} seconds", shift.getId(), delaySeconds);
             taskScheduler.schedule(
-                    () -> redirectToOnCallPerson(shift.getId()),
+                    () -> self.redirectToOnCallPerson(shift.getId()),
                     Instant.now().plusSeconds(delaySeconds));
         } else {
             log.error("Shift {} redirect FAILED after {} attempts — will be retried by fallback checker only",
@@ -256,9 +267,10 @@ public class CallRedirectionScheduler {
         for (var shift : allFutureShifts) {
             if (isActive(shift, now)) {
                 activeCount++;
-                // Schedule immediate redirect in a separate thread to avoid blocking startup
+                // Schedule immediate redirect in a separate thread to avoid blocking startup.
+                // Use self (proxy) to ensure @Transactional is applied.
                 taskScheduler.schedule(
-                        () -> redirectToOnCallPerson(shift.getId()),
+                        () -> self.redirectToOnCallPerson(shift.getId()),
                         Instant.now().plusSeconds(2));
             } else {
                 futureCount++;
@@ -280,7 +292,7 @@ public class CallRedirectionScheduler {
      * missed transitions.
      */
     @Scheduled(fixedDelayString = "#{@zadarmaConfig.redirect.fallbackCheckIntervalSeconds * 1000}")
-    @Transactional(readOnly = true)
+    @Transactional
     public void fallbackCheck() {
         OffsetDateTime now = OffsetDateTime.now();
         var activeShifts = shiftRepository.findCurrentlyActive(now);
@@ -309,7 +321,7 @@ public class CallRedirectionScheduler {
                 if (needsUpdate) {
                     log.info("Fallback: fixing redirection for shift {} (group '{}', person '{}')",
                             shift.getId(), shift.getOnCallGroup().getName(), shift.getPerson().getName());
-                    redirectToOnCallPerson(shift.getId());
+                    self.redirectToOnCallPerson(shift.getId());
                 }
             } catch (Exception e) {
                 log.warn("Fallback check error for shift {}: {}", shift.getId(), e.getMessage());

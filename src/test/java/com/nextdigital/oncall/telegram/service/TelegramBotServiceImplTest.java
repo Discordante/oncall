@@ -10,7 +10,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import static org.mockito.Mockito.never;
@@ -20,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.nextdigital.oncall.entity.OnCallGroup;
 import com.nextdigital.oncall.entity.Person;
+import com.nextdigital.oncall.entity.TelegramGroupConfig;
 import com.nextdigital.oncall.entity.TelegramPendingLink;
 import com.nextdigital.oncall.repository.OnCallGroupRepository;
 import com.nextdigital.oncall.repository.PersonRepository;
@@ -65,12 +65,16 @@ class TelegramBotServiceImplTest {
         personId = UUID.randomUUID();
         validCode = UUID.randomUUID().toString().replace("-", "");
 
+        var config = TelegramGroupConfig.builder()
+                .botToken("test:token")
+                .groupChatId("-1001234567890")
+                .botEnabled(true)
+                .build();
+
         group = OnCallGroup.builder()
                 .id(groupId)
                 .name("Test Group")
-                .telegramBotToken("test:token")
-                .telegramGroupChatId("-1001234567890")
-                .telegramBotEnabled(true)
+                .telegramGroupConfig(config)
                 .build();
 
         person = Person.builder()
@@ -263,7 +267,7 @@ class TelegramBotServiceImplTest {
 
     @Test
     void registerGroupBot_withDisabledGroup_doesNotRegister() {
-        group.setTelegramBotEnabled(false);
+        group.getTelegramGroupConfig().setBotEnabled(false);
         when(onCallGroupRepository.findById(groupId)).thenReturn(Optional.of(group));
 
         service.registerGroupBot(groupId);
@@ -273,7 +277,7 @@ class TelegramBotServiceImplTest {
 
     @Test
     void registerGroupBot_withMissingToken_doesNotRegister() {
-        group.setTelegramBotToken(null);
+        group.getTelegramGroupConfig().setBotToken(null);
         when(onCallGroupRepository.findById(groupId)).thenReturn(Optional.of(group));
 
         service.registerGroupBot(groupId);
@@ -308,10 +312,11 @@ class TelegramBotServiceImplTest {
 
     @Test
     void generateGroupInviteLink_withValidGroup_generatesLink() {
+        var config = group.getTelegramGroupConfig();
         when(onCallGroupRepository.findById(groupId)).thenReturn(Optional.of(group));
-        when(apiClient.verifyBotInGroup(group.getTelegramBotToken(), group.getTelegramGroupChatId()))
+        when(apiClient.verifyBotInGroup(config.getBotToken(), config.getGroupChatId()))
                 .thenReturn(true);
-        when(apiClient.createChatInviteLink(group.getTelegramBotToken(), group.getTelegramGroupChatId()))
+        when(apiClient.createChatInviteLink(config.getBotToken(), config.getGroupChatId()))
                 .thenReturn("https://t.me/+AbCdEf1234");
         when(onCallGroupRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -319,7 +324,7 @@ class TelegramBotServiceImplTest {
 
         assertThat(result).isEqualTo("https://t.me/+AbCdEf1234");
         verify(onCallGroupRepository).save(group);
-        assertThat(group.getTelegramGroupInviteLink()).isEqualTo("https://t.me/+AbCdEf1234");
+        assertThat(config.getGroupInviteLink()).isEqualTo("https://t.me/+AbCdEf1234");
     }
 
     @Test
@@ -333,7 +338,7 @@ class TelegramBotServiceImplTest {
 
     @Test
     void generateGroupInviteLink_withMissingConfig_returnsNull() {
-        group.setTelegramBotToken(null);
+        group.getTelegramGroupConfig().setBotToken(null);
         when(onCallGroupRepository.findById(groupId)).thenReturn(Optional.of(group));
 
         var result = service.generateGroupInviteLink(groupId);
@@ -343,8 +348,9 @@ class TelegramBotServiceImplTest {
 
     @Test
     void generateGroupInviteLink_whenBotNotInGroup_returnsNull() {
+        var config = group.getTelegramGroupConfig();
         when(onCallGroupRepository.findById(groupId)).thenReturn(Optional.of(group));
-        when(apiClient.verifyBotInGroup(group.getTelegramBotToken(), group.getTelegramGroupChatId()))
+        when(apiClient.verifyBotInGroup(config.getBotToken(), config.getGroupChatId()))
                 .thenReturn(false);
 
         var result = service.generateGroupInviteLink(groupId);

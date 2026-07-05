@@ -123,16 +123,17 @@ public class TelegramBotServiceImpl implements TelegramBotService {
     @Override
     public void registerGroupBot(UUID groupId) {
         var group = onCallGroupRepository.findById(groupId).orElse(null);
-        if (group == null || group.getTelegramBotToken() == null || !group.getTelegramBotEnabled()) {
+        var config = group != null ? group.getTelegramGroupConfig() : null;
+        if (group == null || config == null || config.getBotToken() == null || !config.getBotEnabled()) {
             log.warn("Cannot register bot for group {}: invalid config", groupId);
             return;
         }
         var instance = new BotInstance(
-                group.getTelegramBotToken(),
-                group.getTelegramGroupChatId(),
+                config.getBotToken(),
+                config.getGroupChatId(),
                 0L);
         activeBots.put(groupId, instance);
-        log.info("Bot registered for group {}: chatId={}", groupId, group.getTelegramGroupChatId());
+        log.info("Bot registered for group {}: chatId={}", groupId, config.getGroupChatId());
     }
 
     @Override
@@ -296,8 +297,14 @@ public class TelegramBotServiceImpl implements TelegramBotService {
             return null;
         }
 
-        var botToken = group.getTelegramBotToken();
-        var chatId = group.getTelegramGroupChatId();
+        var config = group.getTelegramGroupConfig();
+        if (config == null) {
+            log.warn("Cannot generate invite link for group {}: no Telegram config", groupId);
+            return null;
+        }
+
+        var botToken = config.getBotToken();
+        var chatId = config.getGroupChatId();
 
         if (botToken == null || chatId == null) {
             log.warn("Cannot generate invite link for group {}: bot not fully configured", groupId);
@@ -313,7 +320,7 @@ public class TelegramBotServiceImpl implements TelegramBotService {
         // Generate the invite link
         var inviteLink = apiClient.createChatInviteLink(botToken, chatId);
         if (inviteLink != null) {
-            group.setTelegramGroupInviteLink(inviteLink);
+            config.setGroupInviteLink(inviteLink);
             onCallGroupRepository.save(group);
             log.info("Invite link generated for group {}: {}", groupId, inviteLink);
         }

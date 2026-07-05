@@ -10,6 +10,7 @@ import com.nextdigital.oncall.dto.PersonResponse;
 import com.nextdigital.oncall.entity.Application;
 import com.nextdigital.oncall.entity.OnCallGroup;
 import com.nextdigital.oncall.entity.Person;
+import com.nextdigital.oncall.entity.TelegramGroupConfig;
 
 public final class OnCallGroupMapper {
 
@@ -25,13 +26,16 @@ public final class OnCallGroupMapper {
                                 .map(PersonMapper::toResponse)
                                 .collect(Collectors.toSet());
 
+                var config = entity.getTelegramGroupConfig();
+
                 return new OnCallGroupResponse(
                                 entity.getId(),
                                 entity.getName(),
                                 entity.getGrossPricePerDay(),
-                                entity.getTelegramGroupChatId(),
-                                entity.getTelegramBotEnabled() != null && entity.getTelegramBotEnabled(),
-                                entity.getTelegramGroupInviteLink(),
+                                config != null ? config.getGroupChatId() : null,
+                                config != null ? config.getBotToken() : null,
+                                config != null && config.getBotEnabled() != null && config.getBotEnabled(),
+                                config != null ? config.getGroupInviteLink() : null,
                                 applications,
                                 people,
                                 entity.getCreatedAt(),
@@ -50,15 +54,8 @@ public final class OnCallGroupMapper {
                                 .people(people)
                                 .build();
 
-                if (request.telegramBotToken() != null) {
-                        group.setTelegramBotToken(request.telegramBotToken());
-                }
-                if (request.telegramGroupChatId() != null) {
-                        group.setTelegramGroupChatId(request.telegramGroupChatId());
-                }
-                if (request.telegramBotEnabled() != null) {
-                        group.setTelegramBotEnabled(request.telegramBotEnabled());
-                }
+                group.setTelegramGroupConfig(buildTelegramConfig(request));
+
                 if (request.zadarmaSipId() != null) {
                         group.setZadarmaSipId(request.zadarmaSipId());
                 }
@@ -77,20 +74,47 @@ public final class OnCallGroupMapper {
                 entity.setApplications(applications);
                 entity.setPeople(people);
 
-                if (request.telegramBotToken() != null) {
-                        entity.setTelegramBotToken(request.telegramBotToken());
+                var newConfig = buildTelegramConfig(request);
+                if (newConfig != null) {
+                        var existingConfig = entity.getTelegramGroupConfig();
+                        if (existingConfig != null) {
+                                existingConfig.setBotToken(newConfig.getBotToken());
+                                existingConfig.setGroupChatId(newConfig.getGroupChatId());
+                                existingConfig.setBotEnabled(newConfig.getBotEnabled());
+                                existingConfig.setGroupInviteLink(null); // preserve existing invite link
+                        } else {
+                                entity.setTelegramGroupConfig(newConfig);
+                        }
+                } else {
+                        // All telegram fields are null in request -> remove config
+                        entity.setTelegramGroupConfig(null);
                 }
-                if (request.telegramGroupChatId() != null) {
-                        entity.setTelegramGroupChatId(request.telegramGroupChatId());
-                }
-                if (request.telegramBotEnabled() != null) {
-                        entity.setTelegramBotEnabled(request.telegramBotEnabled());
-                }
+
                 if (request.zadarmaSipId() != null) {
                         entity.setZadarmaSipId(request.zadarmaSipId());
                 }
                 if (request.zadarmaRedirectionType() != null) {
                         entity.setZadarmaRedirectionType(request.zadarmaRedirectionType());
                 }
+        }
+
+        /**
+         * Builds a TelegramGroupConfig from request fields, or returns null
+         * if no telegram fields are set.
+         */
+        private static TelegramGroupConfig buildTelegramConfig(OnCallGroupRequest request) {
+                boolean hasTelegram = request.telegramBotToken() != null
+                                || request.telegramGroupChatId() != null
+                                || request.telegramBotEnabled() != null;
+
+                if (!hasTelegram) {
+                        return null;
+                }
+
+                return TelegramGroupConfig.builder()
+                                .botToken(request.telegramBotToken())
+                                .groupChatId(request.telegramGroupChatId())
+                                .botEnabled(request.telegramBotEnabled() != null ? request.telegramBotEnabled() : false)
+                                .build();
         }
 }
