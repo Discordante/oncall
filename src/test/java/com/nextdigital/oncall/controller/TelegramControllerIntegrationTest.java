@@ -24,7 +24,9 @@ import com.nextdigital.oncall.dto.OnCallGroupRequest;
 import com.nextdigital.oncall.dto.OnCallGroupResponse;
 import com.nextdigital.oncall.dto.telegram.TelegramLinkRequest;
 import com.nextdigital.oncall.dto.telegram.TelegramLinkResponse;
+import com.nextdigital.oncall.entity.Person;
 import com.nextdigital.oncall.entity.TelegramPendingLink;
+import com.nextdigital.oncall.repository.PersonRepository;
 import com.nextdigital.oncall.repository.TelegramPendingLinkRepository;
 
 import tools.jackson.core.type.TypeReference;
@@ -44,12 +46,27 @@ class TelegramControllerIntegrationTest {
         @Autowired
         private TelegramPendingLinkRepository pendingLinkRepository;
 
+        @Autowired
+        private PersonRepository personRepository;
+
         private String validCode;
         private String expiredCode;
+        private static final String TEST_EMAIL = "test@nextdigital.es";
 
         @BeforeEach
         void setUp() {
                 pendingLinkRepository.deleteAll();
+
+                // Create a test person for authentication
+                if (personRepository.findByEmail(TEST_EMAIL).isEmpty()) {
+                        var person = Person.builder()
+                                        .name("Test User")
+                                        .email(TEST_EMAIL)
+                                        .isActive(true)
+                                        .googleSub("test-google-sub")
+                                        .build();
+                        personRepository.save(person);
+                }
 
                 validCode = UUID.randomUUID().toString().replace("-", "");
                 expiredCode = UUID.randomUUID().toString().replace("-", "");
@@ -78,7 +95,7 @@ class TelegramControllerIntegrationTest {
                 var result = mockMvc.perform(post("/api/v1/telegram/link")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request))
-                                .with(jwt()))
+                                .with(jwt().jwt(jwt -> jwt.claim("email", TEST_EMAIL))))
                                 .andExpect(status().isBadRequest())
                                 .andReturn();
 
@@ -99,7 +116,7 @@ class TelegramControllerIntegrationTest {
                 var result = mockMvc.perform(post("/api/v1/telegram/link")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request))
-                                .with(jwt()))
+                                .with(jwt().jwt(jwt -> jwt.claim("email", TEST_EMAIL))))
                                 .andExpect(status().isBadRequest())
                                 .andReturn();
 
@@ -114,14 +131,14 @@ class TelegramControllerIntegrationTest {
         }
 
         @Test
-        void linkTelegram_withValidCode_returnsNeedsAuth() throws Exception {
+        void linkTelegram_withValidCode_returnsSuccess() throws Exception {
                 var request = new TelegramLinkRequest(validCode);
 
                 var result = mockMvc.perform(post("/api/v1/telegram/link")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request))
-                                .with(jwt()))
-                                .andExpect(status().isBadRequest())
+                                .with(jwt().jwt(jwt -> jwt.claim("email", TEST_EMAIL))))
+                                .andExpect(status().isOk())
                                 .andReturn();
 
                 var response = objectMapper.readValue(
@@ -130,8 +147,8 @@ class TelegramControllerIntegrationTest {
                                 });
 
                 assertThat(response.data()).isNotNull();
-                assertThat(response.data().success()).isFalse();
-                assertThat(response.data().message()).contains("autenticación");
+                assertThat(response.data().success()).isTrue();
+                assertThat(response.data().message()).contains("vinculada");
         }
 
         @Test
