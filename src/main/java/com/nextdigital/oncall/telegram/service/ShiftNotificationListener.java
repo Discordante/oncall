@@ -15,7 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Listens for shift lifecycle events and sends Telegram notifications
- * to the affected on-call group's chat and the involved person.
+ * to the affected on-call group's chat.
  */
 @Slf4j
 @Component
@@ -28,7 +28,7 @@ public class ShiftNotificationListener {
     public void onShiftCreated(ShiftCreatedEvent event) {
         log.debug("Shift created event: {}", event.shiftId());
 
-        var groupMsg = """
+        var msg = """
                 🆕 <b>Nueva guardia asignada</b>
 
                 👤 <b>%s</b>
@@ -40,28 +40,14 @@ public class ShiftNotificationListener {
                 formatDateTime(event.endTime()),
                 durationHours(event.startTime(), event.endTime()));
 
-        botService.notifyGroup(event.groupId(), groupMsg);
-
-        var personMsg = """
-                🆕 <b>Se te ha asignado una nueva guardia</b>
-
-                📋 Grupo: <b>%s</b>
-                📆 %s → %s
-                ⏱ %d h
-                """.formatted(
-                event.groupName(),
-                formatDateTime(event.startTime()),
-                formatDateTime(event.endTime()),
-                durationHours(event.startTime(), event.endTime()));
-
-        botService.notifyPerson(event.personId(), personMsg);
+        botService.notifyGroup(event.groupId(), msg);
     }
 
     @EventListener
     public void onShiftUpdated(ShiftUpdatedEvent event) {
         log.debug("Shift updated event: {}", event.shiftId());
 
-        var groupMsg = """
+        var msg = """
                 🔄 <b>Guardia modificada</b>
 
                 👤 <b>%s</b>
@@ -74,29 +60,14 @@ public class ShiftNotificationListener {
                 formatDateTime(event.newStartTime()),
                 formatDateTime(event.newEndTime()));
 
-        botService.notifyGroup(event.groupId(), groupMsg);
-
-        var personMsg = """
-                🔄 <b>Tu guardia ha sido modificada</b>
-
-                📋 Grupo: <b>%s</b>
-                📆 Anterior: %s → %s
-                📆 Nueva: %s → %s
-                """.formatted(
-                event.groupName(),
-                formatDateTime(event.oldStartTime()),
-                formatDateTime(event.oldEndTime()),
-                formatDateTime(event.newStartTime()),
-                formatDateTime(event.newEndTime()));
-
-        botService.notifyPerson(event.personId(), personMsg);
+        botService.notifyGroup(event.groupId(), msg);
     }
 
     @EventListener
     public void onShiftDeleted(ShiftDeletedEvent event) {
         log.debug("Shift deleted event: {}", event.shiftId());
 
-        var groupMsg = """
+        var msg = """
                 ❌ <b>Guardia cancelada</b>
 
                 👤 <b>%s</b>
@@ -106,19 +77,7 @@ public class ShiftNotificationListener {
                 formatDateTime(event.startTime()),
                 formatDateTime(event.endTime()));
 
-        botService.notifyGroup(event.groupId(), groupMsg);
-
-        var personMsg = """
-                ❌ <b>Tu guardia ha sido cancelada</b>
-
-                📋 Grupo: <b>%s</b>
-                📆 %s → %s
-                """.formatted(
-                event.groupName(),
-                formatDateTime(event.startTime()),
-                formatDateTime(event.endTime()));
-
-        botService.notifyPerson(event.personId(), personMsg);
+        botService.notifyGroup(event.groupId(), msg);
     }
 
     private String formatDateTime(OffsetDateTime dt) {
