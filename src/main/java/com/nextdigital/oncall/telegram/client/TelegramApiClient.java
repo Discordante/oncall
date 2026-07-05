@@ -1,7 +1,6 @@
 package com.nextdigital.oncall.telegram.client;
 
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -58,7 +57,7 @@ public class TelegramApiClient {
         try {
             var payload = new SendMessagePayload(chatId, text, parseMode);
             var response = restClient.post()
-                    .uri("/bot{token}/sendMessage", botToken)
+                    .uri("/{token}/sendMessage", botToken)
                     .body(payload)
                     .retrieve()
                     .body(TelegramResponse.class);
@@ -87,7 +86,7 @@ public class TelegramApiClient {
     public boolean setWebhook(String botToken, String url) {
         try {
             var response = restClient.post()
-                    .uri("/bot{token}/setWebhook?url={url}", botToken, url)
+                    .uri("/{token}/setWebhook?url={url}", botToken, url)
                     .retrieve()
                     .body(TelegramResponse.class);
 
@@ -113,7 +112,7 @@ public class TelegramApiClient {
     public boolean deleteWebhook(String botToken) {
         try {
             var response = restClient.post()
-                    .uri("/bot{token}/deleteWebhook", botToken)
+                    .uri("/{token}/deleteWebhook", botToken)
                     .retrieve()
                     .body(TelegramResponse.class);
 
@@ -143,7 +142,7 @@ public class TelegramApiClient {
         try {
             var response = restClient.get()
                     .uri(uriBuilder -> uriBuilder
-                            .path("/bot{token}/getUpdates")
+                            .path("/{token}/getUpdates")
                             .queryParam("offset", offset)
                             .queryParam("timeout", timeout)
                             .build(botToken))
@@ -172,7 +171,7 @@ public class TelegramApiClient {
     public String createChatInviteLink(String botToken, String chatId) {
         try {
             var response = restClient.post()
-                    .uri("/bot{token}/createChatInviteLink?chat_id={chatId}",
+                    .uri("/{token}/createChatInviteLink?chat_id={chatId}",
                             botToken, chatId)
                     .retrieve()
                     .body(JsonNode.class);
@@ -204,7 +203,7 @@ public class TelegramApiClient {
     public boolean verifyBotInGroup(String botToken, String chatId) {
         try {
             var response = restClient.post()
-                    .uri("/bot{token}/sendChatAction?chat_id={chatId}&action=typing",
+                    .uri("/{token}/sendChatAction?chat_id={chatId}&action=typing",
                             botToken, chatId)
                     .retrieve()
                     .body(TelegramResponse.class);
