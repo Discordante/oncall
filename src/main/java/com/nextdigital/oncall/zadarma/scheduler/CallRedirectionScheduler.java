@@ -172,6 +172,31 @@ public class CallRedirectionScheduler {
             return;
         }
 
+        // Check current destination before calling the API.
+        // Avoids unnecessary setSipRedirection calls and duplicate events on restart.
+        var currentDest = zadarmaService.getCurrentRedirectionDestination(
+                shift.getOnCallGroup().getId());
+        String expectedPhone = zadarmaService.normalizePhoneNumber(
+                shift.getPerson().getPhoneNumber());
+
+        boolean alreadyCorrect = currentDest.isPresent()
+                && expectedPhone != null
+                && expectedPhone.equals(currentDest.get())
+                && !"failed".equals(shift.getRedirectStatus());
+
+        if (alreadyCorrect) {
+            log.debug("Shift {} already correctly redirected to {} — skipping",
+                    shiftId, shift.getPerson().getName());
+            // Still update lastAttemptAt if it was never set (e.g. first startup after
+            // deploy)
+            if (shift.getRedirectLastAttemptAt() == null) {
+                shift.setRedirectLastAttemptAt(now);
+                shift.setRedirectStatus("ok");
+                shiftRepository.save(shift);
+            }
+            return;
+        }
+
         boolean success = zadarmaService.redirectToPerson(
                 shift.getOnCallGroup().getId(), shift.getPerson().getId());
 
@@ -311,31 +336,8 @@ public class CallRedirectionScheduler {
         log.debug("Fallback check: verifying {} active shifts", activeShifts.size());
 
         for (var shift : activeShifts) {
-            // Skip groups that don't use Zadarma
-            String sipId = shift.getOnCallGroup().getZadarmaSipId();
-            if (sipId == null || sipId.isBlank()) {
-                continue;
-            }
-
             try {
-                var currentDest = zadarmaService.getCurrentRedirectionDestination(
-                        shift.getOnCallGroup().getId());
-                String expectedPhone = zadarmaService.normalizePhoneNumber(
-                        shift.getPerson().getPhoneNumber());
-
-                boolean needsUpdate = currentDest.isEmpty()
-                        || (expectedPhone != null && !expectedPhone.equals(currentDest.get()));
-
-                // Also retry shifts marked as failed
-                if ("failed".equals(shift.getRedirectStatus())) {
-                    needsUpdate = true;
-                }
-
-                if (needsUpdate) {
-                    log.info("Fallback: fixing redirection for shift {} (group '{}', person '{}')",
-                            shift.getId(), shift.getOnCallGroup().getName(), shift.getPerson().getName());
-                    self.redirectToOnCallPerson(shift.getId());
-                }
+                self.redirectToOnCallPerson(shift.getId());
             } catch (Exception e) {
                 log.warn("Fallback check error for shift {}: {}", shift.getId(), e.getMessage());
             }
