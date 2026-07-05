@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -33,15 +34,15 @@ public class TelegramApiClient {
     }
 
     /**
-     * Sends a text message to a Telegram chat.
+     * Sends a text message to a Telegram chat using MarkdownV2 formatting.
      *
      * @param botToken the bot token
      * @param chatId   the target chat ID
-     * @param text     the message text
+     * @param text     the message text (MarkdownV2 formatted)
      * @return true if the message was sent successfully
      */
     public boolean sendMessage(String botToken, String chatId, String text) {
-        return sendMessage(botToken, chatId, text, null);
+        return sendMessage(botToken, chatId, text, PARSE_MODE_MARKDOWN);
     }
 
     /**
@@ -224,15 +225,11 @@ public class TelegramApiClient {
 
     // ========== Internal DTOs for Telegram API ==========
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private record SendMessagePayload(
             @JsonProperty("chat_id") String chatId,
             String text,
             @JsonProperty("parse_mode") String parseMode) {
-        SendMessagePayload(String chatId, String text, String parseMode) {
-            this.chatId = chatId;
-            this.text = text;
-            this.parseMode = parseMode;
-        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
