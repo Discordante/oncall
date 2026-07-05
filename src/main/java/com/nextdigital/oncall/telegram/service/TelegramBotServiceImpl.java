@@ -11,8 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.nextdigital.oncall.dto.telegram.TelegramLinkResponse;
-import com.nextdigital.oncall.entity.OnCallGroup;
-import com.nextdigital.oncall.entity.Person;
 import com.nextdigital.oncall.entity.TelegramPendingLink;
 import com.nextdigital.oncall.repository.OnCallGroupRepository;
 import com.nextdigital.oncall.repository.PersonRepository;
