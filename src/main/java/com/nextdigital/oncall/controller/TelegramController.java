@@ -1,6 +1,8 @@
 package com.nextdigital.oncall.controller;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.nextdigital.oncall.dto.ApiResponse;
 import com.nextdigital.oncall.dto.telegram.TelegramLinkRequest;
 import com.nextdigital.oncall.dto.telegram.TelegramLinkResponse;
+import com.nextdigital.oncall.repository.PersonRepository;
 import com.nextdigital.oncall.telegram.service.TelegramBotServiceImpl;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 public class TelegramController {
 
     private final TelegramBotServiceImpl telegramBotService;
+    private final PersonRepository personRepository;
 
     @PostMapping("/link")
     @Operation(summary = "Vincular una cuenta de Telegram", description = """
@@ -35,7 +39,28 @@ public class TelegramController {
             """)
     public ResponseEntity<ApiResponse<TelegramLinkResponse>> linkTelegram(
             @Valid @RequestBody TelegramLinkRequest request) {
-        var result = telegramBotService.linkTelegramAccount(request.code());
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+
+        if (!(auth instanceof JwtAuthenticationToken jwtAuth)) {
+            return ResponseEntity.status(401).body(ApiResponse.success(
+                    new TelegramLinkResponse(false, "No autenticado. Inicia sesión con Google.")));
+        }
+
+        var email = jwtAuth.getToken().getClaimAsString("email");
+        if (email == null) {
+            return ResponseEntity.status(401).body(ApiResponse.success(
+                    new TelegramLinkResponse(false, "Token inválido: no contiene email.")));
+        }
+
+        var person = personRepository.findByEmail(email).orElse(null);
+        if (person == null) {
+            return ResponseEntity.badRequest().body(ApiResponse.success(
+                    new TelegramLinkResponse(false,
+                            "No se encontró un usuario con el email " + email
+                                    + ". Debes iniciar sesión con tu cuenta @nextdigital.es.")));
+        }
+
+        var result = telegramBotService.linkForPerson(person.getId(), request.code());
         if (result.success()) {
             return ResponseEntity.ok(ApiResponse.success(result));
         }

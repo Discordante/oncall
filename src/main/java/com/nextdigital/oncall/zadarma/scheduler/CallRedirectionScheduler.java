@@ -310,7 +310,7 @@ public class CallRedirectionScheduler {
             scheduleShiftTransitions(shift);
         }
 
-        log.info("Startup recovery complete: {} active shifts (redirecting now), {} future shifts scheduled",
+        log.info("Startup recovery complete: evaluated {} active shifts and {} future shifts — transitions scheduled",
                 activeCount, futureCount);
     }
 

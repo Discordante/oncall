@@ -54,4 +54,14 @@ public interface TelegramBotService {
      * @return the invite link, or null if failed
      */
     String generateGroupInviteLink(UUID groupId);
+
+    /**
+     * Links a Telegram chat to a specific person after they enter the
+     * verification code in the web app.
+     *
+     * @param personId the person's UUID
+     * @param code     the verification code from /start
+     * @return response indicating success or failure
+     */
+    TelegramLinkResponse linkForPerson(UUID personId, String code);
 }
