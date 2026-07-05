@@ -57,7 +57,8 @@ public class OnCallGroupServiceImpl implements OnCallGroupService {
         var saved = repository.save(entity);
         log.info("OnCallGroup created: {}", saved.getId());
 
-        if (Boolean.TRUE.equals(saved.getTelegramBotEnabled())) {
+        var config = saved.getTelegramGroupConfig();
+        if (config != null && Boolean.TRUE.equals(config.getBotEnabled())) {
             telegramBotService.registerGroupBot(saved.getId());
             telegramBotService.generateGroupInviteLink(saved.getId());
         }
@@ -69,14 +70,16 @@ public class OnCallGroupServiceImpl implements OnCallGroupService {
     @Transactional
     public OnCallGroupResponse update(UUID id, OnCallGroupRequest request) {
         var entity = findEntity(id);
-        boolean wasEnabled = Boolean.TRUE.equals(entity.getTelegramBotEnabled());
+        var oldConfig = entity.getTelegramGroupConfig();
+        boolean wasEnabled = oldConfig != null && Boolean.TRUE.equals(oldConfig.getBotEnabled());
         var applications = resolveApplications(request.applicationIds());
         var people = resolvePeople(request.personIds());
         OnCallGroupMapper.updateEntity(request, entity, applications, people);
         var saved = repository.save(entity);
         log.info("OnCallGroup updated: {}", saved.getId());
 
-        boolean nowEnabled = Boolean.TRUE.equals(saved.getTelegramBotEnabled());
+        var newConfig = saved.getTelegramGroupConfig();
+        boolean nowEnabled = newConfig != null && Boolean.TRUE.equals(newConfig.getBotEnabled());
         if (nowEnabled && !wasEnabled) {
             telegramBotService.registerGroupBot(saved.getId());
             telegramBotService.generateGroupInviteLink(saved.getId());
