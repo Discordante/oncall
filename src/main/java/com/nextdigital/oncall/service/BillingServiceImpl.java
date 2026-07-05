@@ -62,13 +62,15 @@ public class BillingServiceImpl implements BillingService {
 
         log.debug("Calculating billing for group={} person={} from={} to={}", groupId, personId, from, to);
 
-        // 3. Query shifts
+        // 3. Query shifts overlapping the date range
+        // Uses overlap logic (startTime < to AND endTime > from) to capture shifts
+        // that cross the period boundaries and prorate only the hours inside the range.
         List<Shift> shifts;
         if (personId != null) {
-            shifts = shiftRepository.findByOnCallGroupIdAndPersonIdAndStartTimeBetweenOrderByStartTimeAsc(
+            shifts = shiftRepository.findOverlappingByGroupAndPerson(
                     groupId, personId, from, to);
         } else {
-            shifts = shiftRepository.findByOnCallGroupIdAndStartTimeBetweenOrderByStartTimeAsc(
+            shifts = shiftRepository.findOverlappingByGroup(
                     groupId, from, to);
         }
 
@@ -97,8 +99,9 @@ public class BillingServiceImpl implements BillingService {
             BigDecimal personTotalBilling = BigDecimal.ZERO;
 
             for (Shift shift : personShifts) {
-                // Calculate shift hours with fractional precision
-                BigDecimal shiftHours = calculateHours(shift);
+                // Calculate only the hours that fall within the billing period
+                // (prorates shifts that cross the period boundaries)
+                BigDecimal shiftHours = calculateOverlapHours(shift, from, to);
                 personTotalHours = personTotalHours.add(shiftHours);
 
                 // Look up effective price at the time of the shift
@@ -142,7 +145,25 @@ public class BillingServiceImpl implements BillingService {
     }
 
     /**
-     * Calculates the duration of a shift in hours with fractional precision.
+     * Calculates only the hours of a shift that overlap with the given date range.
+     * This ensures shifts that cross the period boundaries are prorated correctly,
+     * billing only for the time actually worked within the period.
+     */
+    private BigDecimal calculateOverlapHours(Shift shift, OffsetDateTime rangeFrom, OffsetDateTime rangeTo) {
+        OffsetDateTime effectiveStart = shift.getStartTime().isBefore(rangeFrom) ? rangeFrom : shift.getStartTime();
+        OffsetDateTime effectiveEnd = shift.getEndTime().isAfter(rangeTo) ? rangeTo : shift.getEndTime();
+
+        long millis = Duration.between(effectiveStart, effectiveEnd).toMillis();
+        if (millis <= 0) {
+            return BigDecimal.ZERO.setScale(HOURS_SCALE, RoundingMode.HALF_UP);
+        }
+        return BigDecimal.valueOf(millis)
+                .divide(BigDecimal.valueOf(3_600_000), HOURS_SCALE, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Calculates the full duration of a shift in hours with fractional precision.
+     * Used for non-billing purposes where the complete shift length is needed.
      */
     private BigDecimal calculateHours(Shift shift) {
         long millis = Duration.between(shift.getStartTime(), shift.getEndTime()).toMillis();

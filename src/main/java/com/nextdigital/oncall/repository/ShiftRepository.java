@@ -50,6 +50,24 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
 
         List<Shift> findByPersonIdOrderByStartTimeAsc(UUID personId);
 
+        @Query("SELECT s FROM Shift s WHERE s.onCallGroup.id = :groupId " +
+                        "AND s.startTime < :endTime AND s.endTime > :startTime " +
+                        "ORDER BY s.startTime ASC")
+        List<Shift> findOverlappingByGroup(
+                        @Param("groupId") UUID groupId,
+                        @Param("startTime") OffsetDateTime startTime,
+                        @Param("endTime") OffsetDateTime endTime);
+
+        @Query("SELECT s FROM Shift s WHERE s.onCallGroup.id = :groupId " +
+                        "AND s.person.id = :personId " +
+                        "AND s.startTime < :endTime AND s.endTime > :startTime " +
+                        "ORDER BY s.startTime ASC")
+        List<Shift> findOverlappingByGroupAndPerson(
+                        @Param("groupId") UUID groupId,
+                        @Param("personId") UUID personId,
+                        @Param("startTime") OffsetDateTime startTime,
+                        @Param("endTime") OffsetDateTime endTime);
+
         List<Shift> findByOnCallGroupIdAndStartTimeBetweenOrderByStartTimeAsc(
                         UUID onCallGroupId, OffsetDateTime startTime, OffsetDateTime endTime);
 

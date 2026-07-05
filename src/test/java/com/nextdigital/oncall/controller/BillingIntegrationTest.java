@@ -54,6 +54,8 @@ class BillingIntegrationTest {
         private final OffsetDateTime JUN_08_12 = OffsetDateTime.parse("2026-06-08T12:00:00Z");
         private final OffsetDateTime JUN_15 = OffsetDateTime.parse("2026-06-15T00:00:00Z");
         private final OffsetDateTime JUN_30 = OffsetDateTime.parse("2026-06-30T23:59:59Z");
+        private final OffsetDateTime MAY_31_20 = OffsetDateTime.parse("2026-05-31T20:00:00Z");
+        private final OffsetDateTime JUN_02_08 = OffsetDateTime.parse("2026-06-02T08:00:00Z");
 
         @BeforeEach
         void setUp() throws Exception {
@@ -265,5 +267,45 @@ class BillingIntegrationTest {
                                 .param("to", JUN_30.toString())
                                 .with(jwt()))
                                 .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        void calculateBilling_withShiftCrossingFromBoundary_proratesCorrectly() throws Exception {
+                // Shift starts BEFORE June (May 31 20:00) and ends INSIDE June (Jun 2 08:00)
+                // Total shift: 36h, but only 32h should be billed (Jun 1 00:00 → Jun 2 08:00)
+                mockMvc.perform(post("/api/v1/shifts")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(
+                                                new ShiftRequest(groupId, personAId, MAY_31_20, JUN_02_08)))
+                                .with(jwt()))
+                                .andExpect(status().isCreated());
+
+                var result = mockMvc.perform(get("/api/v1/billing")
+                                .param("groupId", groupId.toString())
+                                .param("personId", personAId.toString())
+                                .param("from", JUN_01.toString())
+                                .param("to", JUN_30.toString())
+                                .with(jwt()))
+                                .andExpect(status().isOk())
+                                .andReturn();
+
+                var response = objectMapper.readValue(
+                                result.getResponse().getContentAsString(),
+                                new TypeReference<ApiResponse<BillingReportResponse>>() {
+                                });
+
+                assertThat(response.data().details()).hasSize(1);
+                assertThat(response.data().details().get(0).personId()).isEqualTo(personAId);
+                // 32h = 1.3333 days × 100 = 133.33
+                assertThat(response.data().details().get(0).totalHours())
+                                .isEqualByComparingTo(new java.math.BigDecimal("32.0000"));
+                assertThat(response.data().details().get(0).totalDays())
+                                .isEqualByComparingTo(new java.math.BigDecimal("1.3333"));
+                assertThat(response.data().details().get(0).totalBilling())
+                                .isEqualByComparingTo(new java.math.BigDecimal("133.33"));
+                assertThat(response.data().totalHours())
+                                .isEqualByComparingTo(new java.math.BigDecimal("32.0000"));
+                assertThat(response.data().totalBilling())
+                                .isEqualByComparingTo(new java.math.BigDecimal("133.33"));
         }
 }
