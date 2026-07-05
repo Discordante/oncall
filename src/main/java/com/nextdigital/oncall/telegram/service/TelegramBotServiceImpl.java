@@ -11,8 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.nextdigital.oncall.dto.telegram.TelegramLinkResponse;
-import com.nextdigital.oncall.entity.OnCallGroup;
-import com.nextdigital.oncall.entity.Person;
 import com.nextdigital.oncall.entity.TelegramPendingLink;
 import com.nextdigital.oncall.repository.OnCallGroupRepository;
 import com.nextdigital.oncall.repository.PersonRepository;
@@ -200,13 +198,15 @@ public class TelegramBotServiceImpl implements TelegramBotService {
 
         log.debug("Received message from {} in group chat {}: {}", fromId, chatId, text);
 
-        if (message.isCommand()) {
+        // /start must be handled before the generic command router,
+        // otherwise isCommand() catches it and handleStartCommand never runs
+        if (text.equalsIgnoreCase("/start")) {
+            handleStartCommand(bot.botToken(), chatId, fromId);
+        } else if (message.isCommand()) {
             var response = commandRouter.route(text, groupId, chatId, fromId);
             if (response != null) {
                 apiClient.sendMessage(bot.botToken(), chatId, response);
             }
-        } else if (text.equalsIgnoreCase("/start")) {
-            handleStartCommand(bot.botToken(), chatId, fromId);
         }
     }
 
