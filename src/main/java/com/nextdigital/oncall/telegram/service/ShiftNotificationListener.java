@@ -2,6 +2,8 @@ package com.nextdigital.oncall.telegram.service;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -35,7 +37,7 @@ public class ShiftNotificationListener {
                 📆 %s → %s
                 ⏱ %d h
                 """.formatted(
-                event.personName(),
+                firstName(event.personName()),
                 formatDateTime(event.startTime()),
                 formatDateTime(event.endTime()),
                 durationHours(event.startTime(), event.endTime()));
@@ -54,7 +56,7 @@ public class ShiftNotificationListener {
                 📆 Anterior: %s → %s
                 📆 Nueva: %s → %s
                 """.formatted(
-                event.personName(),
+                firstName(event.personName()),
                 formatDateTime(event.oldStartTime()),
                 formatDateTime(event.oldEndTime()),
                 formatDateTime(event.newStartTime()),
@@ -73,15 +75,22 @@ public class ShiftNotificationListener {
                 👤 <b>%s</b>
                 📆 %s → %s
                 """.formatted(
-                event.personName(),
+                firstName(event.personName()),
                 formatDateTime(event.startTime()),
                 formatDateTime(event.endTime()));
 
         botService.notifyGroup(event.groupId(), msg);
     }
 
+    private static final ZoneId MADRID = ZoneId.of("Europe/Madrid");
+    private static final DateTimeFormatter DATETIME_TZ = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm (xxx)");
+
     private String formatDateTime(OffsetDateTime dt) {
-        return dt.toLocalDate() + " " + dt.toLocalTime().withSecond(0).withNano(0);
+        return dt.atZoneSameInstant(MADRID).format(DATETIME_TZ);
+    }
+
+    private String firstName(String fullName) {
+        return fullName.split(" ")[0];
     }
 
     private long durationHours(OffsetDateTime start, OffsetDateTime end) {
