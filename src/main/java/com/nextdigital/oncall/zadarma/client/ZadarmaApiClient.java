@@ -227,7 +227,11 @@ public class ZadarmaApiClient {
             var keySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA1");
             mac.init(keySpec);
             byte[] result = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
-            return Base64.getEncoder().encodeToString(result);
+            // Per Zadarma PHP SDK: hash_hmac('sha1', data, secret) returns HEX string,
+            // then base64_encode() encodes that hex string.
+            // So we must hex-encode the raw HMAC bytes first, then Base64 the hex.
+            String hexResult = bytesToHex(result);
+            return Base64.getEncoder().encodeToString(hexResult.getBytes(StandardCharsets.UTF_8));
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new IllegalStateException("HMAC-SHA1 not available", e);
         }
