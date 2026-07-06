@@ -3,10 +3,17 @@ package com.nextdigital.oncall.zadarma.service;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.nextdigital.oncall.zadarma.dto.SipInfoResponse;
+import com.nextdigital.oncall.zadarma.dto.ZadarmaStatsResponse;
+
 /**
- * Service for managing Zadarma VoIP call redirections.
+ * Service for managing Zadarma VoIP call redirections and analytics queries.
  */
 public interface ZadarmaService {
+
+    // ──────────────────────────────────────────────
+    // Call redirection operations
+    // ──────────────────────────────────────────────
 
     /**
      * Redirects the specified group's Zadarma SIP to the given person's phone.
@@ -43,4 +50,26 @@ public interface ZadarmaService {
      * @return normalized phone number (digits only), or null if input is null/blank
      */
     String normalizePhoneNumber(String raw);
+
+    // ──────────────────────────────────────────────
+    // Read-only analytics queries
+    // ──────────────────────────────────────────────
+
+    /**
+     * Returns the list of SIP IDs associated with the Zadarma account,
+     * enriched with the on-call group name if the SIP is assigned to a group.
+     *
+     * @return list of {@link SipInfoResponse} with sipId and optional groupName
+     */
+    java.util.List<SipInfoResponse> getSipList();
+
+    /**
+     * Returns the raw incoming-call statistics from Zadarma for the given period.
+     *
+     * @param start start of the period ({@code YYYY-MM-DD HH:MM:SS}), optional
+     * @param end   end of the period ({@code YYYY-MM-DD HH:MM:SS}), optional
+     * @param sip   optional SIP number filter
+     * @return the full Zadarma API response with status, timeframe and call records
+     */
+    ZadarmaStatsResponse getCallsSummary(String start, String end, String sip);
 }

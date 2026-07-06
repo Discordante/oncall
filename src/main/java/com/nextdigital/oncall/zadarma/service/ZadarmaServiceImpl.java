@@ -1,7 +1,11 @@
 package com.nextdigital.oncall.zadarma.service;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -9,7 +13,11 @@ import com.nextdigital.oncall.exception.ZadarmaApiException;
 import com.nextdigital.oncall.repository.OnCallGroupRepository;
 import com.nextdigital.oncall.repository.PersonRepository;
 import com.nextdigital.oncall.zadarma.client.ZadarmaApiClient;
+import com.nextdigital.oncall.zadarma.client.ZadarmaReadonlyClient;
 import com.nextdigital.oncall.zadarma.client.ZadarmaResponse;
+import com.nextdigital.oncall.zadarma.dto.SipInfoResponse;
+import com.nextdigital.oncall.zadarma.dto.ZadarmaSipListResponse;
+import com.nextdigital.oncall.zadarma.dto.ZadarmaStatsResponse;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +45,7 @@ import lombok.extern.slf4j.Slf4j;
 public class ZadarmaServiceImpl implements ZadarmaService {
 
     private final ZadarmaApiClient zadarmaApiClient;
+    private final ZadarmaReadonlyClient zadarmaReadonlyClient;
     private final OnCallGroupRepository groupRepository;
     private final PersonRepository personRepository;
 
@@ -167,5 +176,52 @@ public class ZadarmaServiceImpl implements ZadarmaService {
             return null;
         }
         return normalized;
+    }
+
+    // ──────────────────────────────────────────────
+    // Read-only analytics queries
+    // ──────────────────────────────────────────────
+
+    @Override
+    public List<SipInfoResponse> getSipList() {
+        try {
+            ZadarmaSipListResponse response = zadarmaReadonlyClient.getSipList();
+            if (response.sips() == null || response.sips().isEmpty()) {
+                log.warn("Zadarma /v1/sip/ returned null or empty sips list");
+                return Collections.emptyList();
+            }
+
+            // Build a map: sipId → group name for quick lookup
+            Map<String, String> sipToGroup = groupRepository.findAll().stream()
+                    .filter(g -> g.getZadarmaSipId() != null && !g.getZadarmaSipId().isBlank())
+                    .collect(Collectors.toMap(
+                            g -> g.getZadarmaSipId().trim(),
+                            g -> g.getName(),
+                            (existing, replacement) -> existing));
+
+            List<SipInfoResponse> enriched = response.sips().stream()
+                    .map(sipId -> new SipInfoResponse(sipId, sipToGroup.get(sipId.trim())))
+                    .toList();
+
+            log.debug("Retrieved {} SIP IDs from Zadarma, {} assigned to groups",
+                    enriched.size(), enriched.stream().filter(s -> s.groupName() != null).count());
+            return enriched;
+        } catch (ZadarmaApiException e) {
+            log.error("Failed to retrieve SIP list: {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    @Override
+    public ZadarmaStatsResponse getCallsSummary(String start, String end, String sip) {
+        try {
+            ZadarmaStatsResponse response = zadarmaReadonlyClient.getStatistics(start, end, sip);
+            log.debug("Received {} incoming call records from Zadarma",
+                    response.stats() != null ? response.stats().size() : 0);
+            return response;
+        } catch (ZadarmaApiException e) {
+            log.error("Failed to retrieve incoming call statistics: {}", e.getMessage());
+            throw e;
+        }
     }
 }
