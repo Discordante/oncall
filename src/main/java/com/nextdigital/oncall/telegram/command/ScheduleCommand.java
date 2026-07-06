@@ -1,6 +1,8 @@
 package com.nextdigital.oncall.telegram.command;
 
-import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
 import org.springframework.stereotype.Component;
@@ -22,7 +24,7 @@ public class ScheduleCommand implements TelegramCommand {
                     + "Asegúrate de enviar este comando en el chat del grupo correcto.";
         }
 
-        var now = OffsetDateTime.now();
+        var now = ZonedDateTime.now(MADRID).toOffsetDateTime();
         var fourWeeksLater = now.plusWeeks(4);
 
         var shifts = shiftService.findAll(null, groupId, now, fourWeeksLater);
@@ -35,23 +37,26 @@ public class ScheduleCommand implements TelegramCommand {
         sb.append("📅 <b>Guardias — Próximas 4 semanas</b>\n\n");
 
         for (var shift : shifts) {
-            var start = shift.startTime();
-            var end = shift.endTime();
-            var personName = shift.personName();
+            var start = shift.startTime().atZoneSameInstant(MADRID);
+            var end = shift.endTime().atZoneSameInstant(MADRID);
+            var personName = shift.personName().split(" ")[0];
 
             sb.append("👤 <b>").append(personName).append("</b>\n");
-            sb.append("   📆 ").append(formatDateTime(start)).append(" → ").append(formatDateTime(end)).append("\n");
+            sb.append("   📆 ").append(formatZoned(start)).append(" → ").append(formatZoned(end)).append("\n");
             sb.append("   ⏱ ").append(durationHours(start, end)).append("h\n\n");
         }
 
         return sb.toString();
     }
 
-    private String formatDateTime(OffsetDateTime dt) {
-        return dt.toLocalDate() + " " + dt.toLocalTime().withSecond(0);
+    private static final ZoneId MADRID = ZoneId.of("Europe/Madrid");
+    private static final DateTimeFormatter DATE_TZ = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm (xxx)");
+
+    private String formatZoned(ZonedDateTime dt) {
+        return dt.format(DATE_TZ);
     }
 
-    private long durationHours(OffsetDateTime start, OffsetDateTime end) {
+    private long durationHours(ZonedDateTime start, ZonedDateTime end) {
         return java.time.Duration.between(start, end).toHours();
     }
 }
