@@ -31,10 +31,13 @@ import lombok.extern.slf4j.Slf4j;
  * on the Zadarma side.
  * </p>
  *
- * <p>Supported operations:</p>
+ * <p>
+ * Supported operations:
+ * </p>
  * <ul>
  * <li>{@code GET /v1/sip/} — list SIP numbers</li>
- * <li>{@code GET /v1/statistics/incoming-calls/} — incoming call statistics with optional date range</li>
+ * <li>{@code GET /v1/statistics/incoming-calls/} — incoming call statistics
+ * with optional date range</li>
  * </ul>
  *
  * @see <a href="https://zadarma.com/es/support/api/#intro">Zadarma API docs</a>
@@ -76,7 +79,8 @@ public class ZadarmaReadonlyClient {
     }
 
     /**
-     * Retrieves incoming call statistics, optionally filtered by date range and SIP.
+     * Retrieves incoming call statistics, optionally filtered by date range and
+     * SIP.
      *
      * @param start start of the period ({@code YYYY-MM-DD HH:MM:SS}), or null
      * @param end   end of the period ({@code YYYY-MM-DD HH:MM:SS}), or null
@@ -134,7 +138,9 @@ public class ZadarmaReadonlyClient {
     /**
      * Builds the HMAC-SHA1 signature for Zadarma API authentication.
      *
-     * <p>Algorithm per Zadarma docs:</p>
+     * <p>
+     * Algorithm per Zadarma docs:
+     * </p>
      * <ol>
      * <li>Sort params alphabetically by key</li>
      * <li>Build query string (RFC 1738)</li>
@@ -146,7 +152,7 @@ public class ZadarmaReadonlyClient {
      */
     static String buildSignature(String httpMethod, String fullPath, String paramsString) {
         String data = httpMethod + paramsString + md5(paramsString);
-        return base64(hmacSha1(data));
+        return hmacSha1(data);
     }
 
     private static String buildQueryString(Map<String, String> params) {
@@ -181,10 +187,6 @@ public class ZadarmaReadonlyClient {
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new IllegalStateException("HMAC-SHA1 not available", e);
         }
-    }
-
-    private static String base64(String input) {
-        return Base64.getEncoder().encodeToString(input.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String bytesToHex(byte[] bytes) {

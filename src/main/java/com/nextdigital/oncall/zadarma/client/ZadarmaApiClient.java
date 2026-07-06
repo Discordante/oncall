@@ -196,7 +196,7 @@ public class ZadarmaApiClient {
      */
     static String buildSignature(String httpMethod, String fullPath, String paramsString) {
         String data = httpMethod + paramsString + md5(paramsString);
-        return base64(hmacSha1(data));
+        return hmacSha1(data);
     }
 
     private static String buildQueryString(Map<String, String> params) {
@@ -231,10 +231,6 @@ public class ZadarmaApiClient {
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {
             throw new IllegalStateException("HMAC-SHA1 not available", e);
         }
-    }
-
-    private static String base64(String input) {
-        return Base64.getEncoder().encodeToString(input.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String bytesToHex(byte[] bytes) {
