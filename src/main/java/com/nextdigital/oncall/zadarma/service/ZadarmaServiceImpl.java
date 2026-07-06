@@ -200,7 +200,7 @@ public class ZadarmaServiceImpl implements ZadarmaService {
                             (existing, replacement) -> existing));
 
             List<SipInfoResponse> enriched = response.sips().stream()
-                    .map(sipId -> new SipInfoResponse(sipId, sipToGroup.get(sipId.trim())))
+                    .map(sipObj -> new SipInfoResponse(sipObj.id(), sipToGroup.get(sipObj.id().trim())))
                     .toList();
 
             log.debug("Retrieved {} SIP IDs from Zadarma, {} assigned to groups",
