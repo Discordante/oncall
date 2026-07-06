@@ -151,7 +151,11 @@ public class ZadarmaReadonlyClient {
      * </ol>
      */
     static String buildSignature(String httpMethod, String fullPath, String paramsString) {
-        String data = httpMethod + paramsString + md5(paramsString);
+        // Per the official Zadarma PHP SDK, the $method parameter in getAuthHeader()
+        // is the API path (e.g. "/v1/sip/"), NOT the HTTP method ("GET"/"PUT").
+        // The signature data is: apiPath + paramsString + md5(paramsString).
+        // Since fullPath = apiPath + paramsString, we can simply use:
+        String data = fullPath + md5(paramsString);
         return hmacSha1(data);
     }
 
