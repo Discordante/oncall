@@ -116,7 +116,7 @@ class OnCallGroupServiceImplTest {
                 null, null, null,
                 Set.of(application.getId()),
                 Set.of(person.getId()),
-                null, null);
+                null, null, null);
 
         when(applicationRepository.findById(application.getId())).thenReturn(Optional.of(application));
         when(personRepository.findById(person.getId())).thenReturn(Optional.of(person));
@@ -145,7 +145,7 @@ class OnCallGroupServiceImplTest {
 
     @Test
     void create_withoutApplicationsAndPeople() {
-        var request = new OnCallGroupRequest("Empty Group", null, null, null, null, null, null, null, null);
+        var request = new OnCallGroupRequest("Empty Group", null, null, null, null, null, null, null, null, null);
 
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -159,7 +159,7 @@ class OnCallGroupServiceImplTest {
     @Test
     void create_throwsWhenApplicationNotFound() {
         var appId = UUID.randomUUID();
-        var request = new OnCallGroupRequest("Group", null, null, null, null, Set.of(appId), null, null, null);
+        var request = new OnCallGroupRequest("Group", null, null, null, null, Set.of(appId), null, null, null, null);
 
         when(applicationRepository.findById(appId)).thenReturn(Optional.empty());
 
@@ -172,7 +172,7 @@ class OnCallGroupServiceImplTest {
     void update_modifiesAndReturnsGroup() {
         var newApp = Application.builder().id(UUID.randomUUID()).name("New App").build();
         var request = new OnCallGroupRequest("Updated Group", new BigDecimal("250.00"),
-                null, null, null, Set.of(newApp.getId()), Set.of(person.getId()), null, null);
+                null, null, null, Set.of(newApp.getId()), Set.of(person.getId()), null, null, null);
 
         when(repository.findById(group.getId())).thenReturn(Optional.of(group));
         when(applicationRepository.findById(newApp.getId())).thenReturn(Optional.of(newApp));

@@ -58,10 +58,18 @@ public class ZadarmaServiceImpl implements ZadarmaService {
             return false;
         }
 
-        String sipId = group.getZadarmaSipId();
-        if (sipId == null || sipId.isBlank()) {
-            log.debug("Group '{}' has no zadarmaSipId configured — skipping redirection", group.getName());
+        var zadarmaConfig = group.getZadarmaConfig();
+        if (zadarmaConfig == null || zadarmaConfig.getSipId() == null || zadarmaConfig.getSipId().isBlank()) {
+            log.debug("Group '{}' has no Zadarma config configured — skipping redirection", group.getName());
             return true; // Not an error — the group simply doesn't use Zadarma
+        }
+
+        String sipId = zadarmaConfig.getSipId();
+
+        if (Boolean.FALSE.equals(zadarmaConfig.getActive())) {
+            log.debug("Group '{}' has Zadarma redirection disabled (active=false) — disabling API redirection",
+                    group.getName());
+            return disableRedirectionBySipId(group.getName(), sipId);
         }
 
         var person = personRepository.findById(personId).orElse(null);
@@ -109,24 +117,28 @@ public class ZadarmaServiceImpl implements ZadarmaService {
             return false;
         }
 
-        String sipId = group.getZadarmaSipId();
-        if (sipId == null || sipId.isBlank()) {
+        var zadarmaConfig = group.getZadarmaConfig();
+        if (zadarmaConfig == null || zadarmaConfig.getSipId() == null || zadarmaConfig.getSipId().isBlank()) {
             return true;
         }
 
+        return disableRedirectionBySipId(group.getName(), zadarmaConfig.getSipId());
+    }
+
+    private boolean disableRedirectionBySipId(String groupName, String sipId) {
         try {
             ZadarmaResponse response = zadarmaApiClient.disableSipRedirection(sipId);
             if (response.isSuccess()) {
-                log.info("Call redirection disabled for group '{}' (SIP {})", group.getName(), sipId);
+                log.info("Call redirection disabled for group '{}' (SIP {})", groupName, sipId);
                 return true;
             } else {
                 log.error("Failed to disable redirection for group '{}': status={}, message={}",
-                        group.getName(), response.status(), response.message());
+                        groupName, response.status(), response.message());
                 return false;
             }
         } catch (ZadarmaApiException e) {
             log.error("Zadarma API call failed while disabling redirection for group '{}': {}",
-                    group.getName(), e.getMessage());
+                    groupName, e.getMessage());
             return false;
         }
     }
@@ -138,10 +150,12 @@ public class ZadarmaServiceImpl implements ZadarmaService {
             return Optional.empty();
         }
 
-        String sipId = group.getZadarmaSipId();
-        if (sipId == null || sipId.isBlank()) {
+        var zadarmaConfig = group.getZadarmaConfig();
+        if (zadarmaConfig == null || zadarmaConfig.getSipId() == null || zadarmaConfig.getSipId().isBlank()) {
             return Optional.empty();
         }
+
+        String sipId = zadarmaConfig.getSipId();
 
         try {
             ZadarmaResponse response = zadarmaApiClient.getSipRedirection(sipId);
@@ -194,9 +208,11 @@ public class ZadarmaServiceImpl implements ZadarmaService {
 
             // Build a map: sipId → group name for quick lookup
             Map<String, String> sipToGroup = groupRepository.findAll().stream()
-                    .filter(g -> g.getZadarmaSipId() != null && !g.getZadarmaSipId().isBlank())
+                    .filter(g -> g.getZadarmaConfig() != null
+                            && g.getZadarmaConfig().getSipId() != null
+                            && !g.getZadarmaConfig().getSipId().isBlank())
                     .collect(Collectors.toMap(
-                            g -> g.getZadarmaSipId().trim(),
+                            g -> g.getZadarmaConfig().getSipId().trim(),
                             g -> g.getName(),
                             (existing, replacement) -> existing));
 

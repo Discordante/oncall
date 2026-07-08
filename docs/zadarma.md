@@ -2,180 +2,407 @@
 
 ## Descripción general
 
-Oncall se integra con la API de Zadarma para redirigir automáticamente las llamadas entrantes al teléfono de la persona que está de guardia **en ese momento**. La redirección se activa cuando comienza un turno y se actualiza cuando termina, saltando al siguiente turno activo o desactivándose si no hay nadie de guardia.
+Oncall se integra con la API de Zadarma para redirigir automáticamente las llamadas entrantes al teléfono de la persona que está de guardia **en ese momento**. La redirección se activa cuando comienza un turno y se actualiza automáticamente cuando termina, saltando al siguiente turno activo.
 
-La integración usa directamente la API HTTP de Zadarma (`api.zadarma.com/v1/`) a través de `RestClient` de Spring Boot, siguiendo el mismo patrón que la integración de Telegram.
+La integración usa directamente la API HTTP de Zadarma (`api.zadarma.com/v1/`) a través de `RestClient` de Spring Boot.
 
 **Solo se necesita 1 llamada a la API por redirección** (`PUT /v1/sip/redirection/`), no el antiguo flujo de 3 llamadas que usaba el script `oncall.sh`.
 
 ---
 
-## Arquitectura
+## Arquitectura de componentes
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                        Capas del proyecto                         │
-├──────────────────────────────────────────────────────────────────┤
-│  zadarma/           ← Nuevo paquete para la integración VoIP      │
-│  ├── client/        ← ZadarmaApiClient (HTTP + firma HMAC-SHA1)  │
-│  ├── service/       ← ZadarmaService / ZadarmaServiceImpl        │
-│  ├── scheduler/     ← CallRedirectionScheduler (núcleo temporal)  │
-│  └── event/         ← ZadarmaRedirectFailedEvent + AlertListener │
-│                                                                   │
-│  entity/            ← OnCallGroup (+ zadarmaSipId, redir. type)  │
-│                      ← Shift (+ redirectStatus, intentos, etc.)   │
-│  dto/               ← DTOs actualizados con campos Zadarma        │
-│  mapper/            ← Mappers actualizados                        │
-│  service/           ← ShiftServiceImpl (engancha con scheduler)   │
-│  exception/         ← ZadarmaApiException + handler 502           │
-│  config/            ← ZadarmaConfig (@ConfigurationProperties)    │
-└──────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Capas del proyecto                           │
+├─────────────────────────────────────────────────────────────────────┤
+│  zadarma/              ← Paquete exclusivo de la integración VoIP    │
+│  ├── client/           ← Clientes HTTP con autenticación HMAC-SHA1   │
+│  │   ├── ZadarmaApiClient        (escritura: PUT redirección)        │
+│  │   ├── ZadarmaReadonlyClient   (lectura: GET listas, estadísticas) │
+│  │   └── ZadarmaResponse         (record genérico de respuesta)      │
+│  ├── service/          ← Lógica de negocio                           │
+│  │   ├── ZadarmaService          (interfaz pública)                  │
+│  │   └── ZadarmaServiceImpl      (implementación)                    │
+│  ├── scheduler/        ← Núcleo de la automatización temporal        │
+│  │   └── CallRedirectionScheduler                                    │
+│  ├── dto/              ← DTOs para respuestas de la API Zadarma       │
+│  └── event/            ← Eventos y listeners para alertas Telegram   │
+│      ├── ZadarmaRedirectSuccessEvent                                 │
+│      ├── ZadarmaRedirectFailedEvent                                  │
+│      └── ZadarmaRedirectAlertListener                                │
+│                                                                      │
+│  entity/               ← Modelos de datos                            │
+│  ├── OnCallGroup       (→ zadarmaConfig: ZadarmaGroupConfig FK)      │
+│  ├── ZadarmaGroupConfig (tabla zadarma_configs, nueva en V8)         │
+│  └── Shift             (campos redirect_status, intentos, etc.)      │
+│                                                                      │
+│  config/ZadarmaConfig  ← @ConfigurationProperties zadarma.api.*     │
+│  controller/ZadarmaController  ← Endpoints GET de consulta          │
+└─────────────────────────────────────────────────────────────────────┘
 ```
-
-### Paquete `zadarma/` (8 archivos)
-
-| Subpaquete | Archivo | Propósito |
-|---|---|---|
-| `client/` | `ZadarmaApiClient.java` | Cliente HTTP con autenticación HMAC-SHA1 |
-| `client/` | `ZadarmaResponse.java` | Record genérico para respuestas de la API |
-| `service/` | `ZadarmaService.java` | Interfaz: `redirectToPerson`, `disableRedirection`, `getCurrentRedirectionDestination`, `normalizePhoneNumber` |
-| `service/` | `ZadarmaServiceImpl.java` | Implementación: valida SIP, normaliza teléfonos, llama a la API |
-| `scheduler/` | `CallRedirectionScheduler.java` | **El núcleo**: scheduler por eventos, recuperación tras reinicio, fallback periódico, reintentos |
-| `event/` | `ZadarmaRedirectFailedEvent.java` | Evento publicado cuando falla una redirección |
-| `event/` | `ZadarmaRedirectAlertListener.java` | Envía alertas de Telegram cuando falla una redirección |
-
-### Archivos relacionados fuera de `zadarma/`
-
-| Archivo | Cambio |
-|---|---|
-| `config/ZadarmaConfig.java` | Propiedades `zadarma.api.*` y `zadarma.redirect.*` |
-| `entity/OnCallGroup.java` | + `zadarmaSipId`, `zadarmaRedirectionType` |
-| `entity/Shift.java` | + `redirectStatus`, `redirectFailedAt`, `redirectLastAttemptAt`, `redirectRetryCount` |
-| `dto/OnCallGroupRequest.java` | + `zadarmaSipId`, `zadarmaRedirectionType` (opcionales) |
-| `dto/OnCallGroupResponse.java` | + `zadarmaSipId`, `zadarmaRedirectionType` |
-| `dto/ShiftResponse.java` | + `redirectStatus` |
-| `mapper/OnCallGroupMapper.java` | Mapea los nuevos campos en ambas direcciones |
-| `mapper/ShiftMapper.java` | Mapea `redirectStatus` en la respuesta |
-| `repository/ShiftRepository.java` | + 5 queries: turnos activos, futuros, siguiente turno, por estado |
-| `service/ShiftServiceImpl.java` | Programa transiciones al crear/actualizar/borrar turnos |
-| `exception/ZadarmaApiException.java` | Excepción unchecked para errores de API |
-| `exception/GlobalExceptionHandler.java` | Handler `@ExceptionHandler` → 502 BAD GATEWAY |
 
 ---
 
-## API de Zadarma utilizada
+## Modelo de datos
 
-### Endpoints
+### Tabla `zadarma_configs` (migración V8)
 
-| Método | Endpoint | Uso |
+La configuración de Zadarma está **separada de `on_call_groups`** en su propia tabla. Un grupo puede no tener configuración (relación 1:1 opcional).
+
+| Columna | Tipo | Descripción |
 |---|---|---|
-| `PUT` | `/v1/sip/redirection/` | Activar/Modificar redirección a un teléfono |
-| `GET` | `/v1/sip/redirection/` | Consultar estado actual (solo para el checker de idempotencia) |
+| `id` | `UUID PK` | Identificador único |
+| `sip_id` | `VARCHAR(255)` | ID del SIP en Zadarma (ej. `"921495"`) |
+| `redirection_type` | `VARCHAR(50) DEFAULT 'sip'` | Tipo de redirección: `sip` o `pbx` |
+| `active` | `BOOLEAN NOT NULL DEFAULT TRUE` | Activa (`true`) o desactiva (`false`) la redirección |
+| `created_at` | `TIMESTAMPTZ` | Fecha de creación |
+| `updated_at` | `TIMESTAMPTZ` | Fecha de última modificación |
 
-### Flujo recomendado vs. flujo antiguo
+### Relación con `on_call_groups`
 
-| Antiguo script `oncall.sh` | Nueva integración |
+```
+on_call_groups
+  └── zadarma_config_id (UUID, UNIQUE, nullable FK → zadarma_configs.id)
+```
+
+- Si `zadarma_config_id IS NULL` → el grupo no usa Zadarma (backward compatible).
+- Si `zadarma_config_id IS NOT NULL` → el grupo tiene config Zadarma; la redirección se ejecuta si `active = true`.
+
+### Tabla `shifts` (campos de estado de redirección, migración V6)
+
+| Columna | Tipo | Descripción |
+|---|---|---|
+| `redirect_status` | `VARCHAR(20)` | `null` (pendiente), `ok`, `failed` |
+| `redirect_failed_at` | `TIMESTAMPTZ` | Cuándo falló la redirección por última vez |
+| `redirect_last_attempt_at` | `TIMESTAMPTZ` | Cuándo se intentó la redirección por última vez |
+| `redirect_retry_count` | `INT DEFAULT 0` | Número de reintentos acumulados |
+
+---
+
+## API REST
+
+### Configurar Zadarma en un grupo
+
+Al crear o actualizar un `OnCallGroup`, el cuerpo de la petición acepta tres campos opcionales de Zadarma:
+
+```json
+POST /api/v1/on-call-groups
+{
+  "name": "Crew OnCall",
+  "grossPricePerDay": "150.00",
+  "zadarmaSipId": "921495",
+  "zadarmaRedirectionType": "sip",
+  "zadarmaActive": true
+}
+```
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `zadarmaSipId` | `String` (opcional) | ID del SIP en Zadarma. Si es `null`, se elimina la config completa. |
+| `zadarmaRedirectionType` | `String` (opcional) | `"sip"` (por defecto) o `"pbx"` |
+| `zadarmaActive` | `Boolean` (opcional) | `true` (por defecto) activa la redirección; `false` la desactiva sin eliminar la config |
+
+La respuesta incluye los tres campos reflejando el estado guardado (`zadarmaActive` es `null` cuando el grupo no tiene config Zadarma).
+
+### Activar y desactivar la redirección
+
+Para **desactivar temporalmente** la redirección sin perder la configuración del SIP:
+
+```json
+PUT /api/v1/on-call-groups/{id}
+{
+  "name": "Crew OnCall",
+  "zadarmaSipId": "921495",
+  "zadarmaActive": false
+}
+```
+
+Efecto inmediato: la próxima vez que el scheduler ejecute `redirectToOnCallPerson` para un turno activo de este grupo, llamará a `PUT /v1/sip/redirection/` con `status=off`, desactivando la redirección en Zadarma.
+
+Para **reactivar**:
+
+```json
+PUT /api/v1/on-call-groups/{id}
+{
+  "name": "Crew OnCall",
+  "zadarmaSipId": "921495",
+  "zadarmaActive": true
+}
+```
+
+El fallback checker (cada 5 min) detectará el cambio y redirigirá al turno activo actual.
+
+Para **eliminar completamente** la config de Zadarma:
+
+```json
+PUT /api/v1/on-call-groups/{id}
+{
+  "name": "Crew OnCall",
+  "zadarmaSipId": null
+}
+```
+
+Esto borra la fila en `zadarma_configs` (via `orphanRemoval=true`).
+
+### Endpoints de consulta (solo lectura)
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `GET` | `/api/v1/zadarma/sips` | Lista todos los SIPs de la cuenta Zadarma, enriquecidos con el nombre del grupo que los usa |
+| `GET` | `/api/v1/zadarma/sip-redirections[?id=...]` | Estado actual de la redirección (destino, condición, etc.) |
+| `GET` | `/api/v1/zadarma/calls-summary[?start=&end=&sip=]` | Estadísticas de llamadas entrantes |
+
+---
+
+## Flujo completo de redirección
+
+### Condiciones previas necesarias
+
+Para que la redirección funcione, se deben cumplir **todas** estas condiciones:
+
+1. El grupo tiene una `ZadarmaGroupConfig` con `sipId` no vacío.
+2. La config tiene `active = true`.
+3. El turno tiene una `Person` asignada con `phoneNumber` configurado.
+4. Las variables de entorno `ZADARMA_API_KEY` y `ZADARMA_API_SECRET` están definidas.
+
+Si **cualquiera** de las condiciones 1–2 falla → la redirección se omite silenciosamente (no es un error).  
+Si la condición 3 falla → la redirección falla y se alerta.
+
+---
+
+### Flujo 1: Creación de un turno futuro
+
+```
+POST /api/v1/shifts { groupId, personId, startTime: T+7d, endTime: T+14d }
+  │
+  └─► ShiftServiceImpl.create()
+        └─► Shift guardado en BD (redirectStatus = null)
+        └─► CallRedirectionScheduler.scheduleShiftTransitions(shift)
+              ├── Programa tarea A: en T+7d → redirectToOnCallPerson(shiftId)
+              └── Programa tarea B: en T+14d → handleShiftEnd(shiftId)
+                                              (log de fin de turno)
+
+[En este punto NO se llama a la API de Zadarma]
+```
+
+### Flujo 2: Llegada del instante de inicio del turno
+
+```
+TaskScheduler dispara redirectToOnCallPerson(shiftId)
+  │
+  ├── El turno ya ha terminado → skip
+  ├── El grupo no tiene ZadarmaGroupConfig o sipId → skip (silencioso)
+  ├── La config tiene active=false → disableSipRedirection() → return
+  │
+  ├── GET /v1/sip/redirection/?id=921495
+  │    └── ¿El destino actual ya es el teléfono esperado?
+  │          └── SÍ → skip (idempotencia, evita PUT redundante)
+  │
+  └── PUT /v1/sip/redirection/ { id: "921495", type: "phone", number: "34653177761" }
+        ├── Éxito → redirectStatus = "ok", resetRedirectRetryCount = 0
+        │           publica ZadarmaRedirectSuccessEvent → notificación Telegram
+        └── Fallo → redirectStatus = "failed"
+                    redirectRetryCount++
+                    publica ZadarmaRedirectFailedEvent → alerta Telegram
+                    programa reintento en 30s×(retryCount+1)
+```
+
+### Flujo 3: Fin del turno
+
+```
+TaskScheduler dispara handleShiftEnd(shiftId)
+  │
+  └── Solo registra log del fin de turno.
+      El siguiente turno — si existe — ya tiene programada su propia
+      tarea de inicio que se encargará de actualizar la redirección.
+      Si no hay siguiente turno, la redirección en Zadarma queda apuntando
+      al último destino (el número del operador saliente).
+```
+
+> **Nota de diseño**: No se desactiva la redirección al final del turno. Esto garantiza que las llamadas siempre tengan destino (aunque sea el operador saliente) mientras no hay turno activo, evitando llamadas no atendidas en brechas entre turnos.
+
+### Flujo 4: Actualización de un turno existente
+
+```
+PUT /api/v1/shifts/{id} { startTime: nueva_hora, ... }
+  │
+  └─► ShiftServiceImpl.update()
+        ├── CallRedirectionScheduler.cancelShiftTransitions(shiftId)
+        │     └── Cancela las tareas A y B del turno anterior
+        └── CallRedirectionScheduler.scheduleShiftTransitions(shift)
+              └── Reprograma con los nuevos instantes
+```
+
+### Flujo 5: Eliminación de un turno activo
+
+```
+DELETE /api/v1/shifts/{id}
+  │
+  └─► ShiftServiceImpl.delete()
+        ├── CallRedirectionScheduler.cancelShiftTransitions(shiftId)
+        └── Si el turno estaba activo:
+              CallRedirectionScheduler.handleActiveShiftRemoved(groupId)
+                ├── Busca el siguiente turno activo del grupo
+                ├── Si existe → redirectToOnCallPerson(siguienteTurnoId)
+                └── Si no existe → log "sin turno activo, manteniendo última redirección"
+```
+
+### Flujo 6: Reinicio del servidor
+
+```
+ApplicationReadyEvent
+  │
+  └─► CallRedirectionScheduler.onStartup()
+        └─► Consulta BD: todos los turnos con endTime > NOW()
+              │
+              ├── Para turnos YA activos (startTime ≤ NOW < endTime):
+              │     └── scheduleShiftTransitions → tarea de inicio ejecutada en 2s
+              │
+              └── Para turnos futuros (startTime > NOW):
+                    └── scheduleShiftTransitions → tarea programada para el futuro
+```
+
+El reinicio es completamente transparente: en ~2 segundos la redirección es correcta para cualquier turno activo.
+
+---
+
+## Fallback checker periódico
+
+```
+@Scheduled(fixedDelayString = "${zadarma.redirect.fallback-check-interval-seconds:300}000")
+// Por defecto: cada 300 segundos (5 minutos)
+```
+
+El fallback checker garantiza la **consistencia entre el estado local y el estado en la API de Zadarma** ante cualquier desviación (cambios manuales en el panel Zadarma, fallos de red transitorios, etc.).
+
+```
+Cada 5 minutos:
+  │
+  └─► Consulta BD: todos los turnos activos ahora (startTime ≤ NOW < endTime)
+        │
+        └─► Para cada turno activo:
+              └─► redirectToOnCallPerson(shiftId)
+                    ├── Si active=false → desactiva redirección
+                    ├── Si destino ya es correcto → skip (idempotente)
+                    └── Si destino es incorrecto → corrige con PUT
+```
+
+El checker también recupera automáticamente los turnos con `redirectStatus = "failed"` que hayan agotado los reintentos automáticos.
+
+---
+
+## Lógica del campo `active`
+
+El campo `active` en `zadarma_configs` permite habilitar/deshabilitar la redirección **sin perder la configuración del SIP ID**.
+
+| Estado | Comportamiento |
 |---|---|
-| 3 llamadas: PUT + GET numbers + GET status | **1 llamada**: PUT |
-| Las llamadas GET eran para mostrar info al operador CLI | El PUT ya devuelve `{status:"success", destination:"..."}` |
-| El GET de estado se usa solo en el fallback checker (evitar PUTs redundantes) | — |
+| Config ausente (`zadarmaConfig = null`) | El grupo no usa Zadarma. Todas las operaciones de redirección son no-ops silenciosos. |
+| Config presente, `active = true` | Redirección habitual. El scheduler redirige al turno activo actual. |
+| Config presente, `active = false` | El scheduler llama a `disableSipRedirection()` en la API de Zadarma. Las llamadas al SIP dejan de redirigirse. La config (`sipId`, `redirectionType`) se conserva para poder reactivar. |
 
-### Autenticación
+**¿Cuándo se aplica el cambio de `active`?** El cambio no es instantáneo por diseño. Se aplica en la siguiente ejecución de `redirectToOnCallPerson` para un turno activo, que puede ser:
+- Cuando el fallback checker se ejecuta (máximo 5 minutos).
+- Cuando empieza el siguiente turno.
+- Cuando se actualiza o elimina un turno activo del grupo.
+
+---
+
+## Reintentos automáticos
+
+Cuando una redirección falla (error de API, red, etc.):
+
+```
+Intento 1 falla
+  └─► redirectStatus = "failed", redirectRetryCount = 1
+      └─► Reintento en 30s  (initialDelay × 1)
+
+Intento 2 falla
+  └─► redirectStatus = "failed", redirectRetryCount = 2
+      └─► Reintento en 60s  (initialDelay × 2)
+
+Intento 3 falla
+  └─► redirectStatus = "failed", redirectRetryCount = 3
+      └─► Reintento en 90s  (initialDelay × 3)
+
+...
+
+Intento 10 falla (retryMaxAttempts)
+  └─► No más reintentos automáticos inmediatos
+      └─► El fallback checker (cada 5 min) sigue intentándolo indefinidamente
+```
+
+La fórmula del retardo es: `retardo = initialDelaySeconds × retryCount` (crecimiento lineal).
+
+**Durante los reintentos, la redirección anterior en Zadarma permanece activa** — las llamadas no se pierden, van al último destino configurado correctamente.
+
+---
+
+## Alertas de Telegram
+
+El listener `ZadarmaRedirectAlertListener` envía mensajes al chat de Telegram del grupo en dos situaciones:
+
+**Redirección exitosa** (nuevo turno activado):
+```
+✅ Redirección de llamadas actualizada
+📋 Grupo: Crew OnCall
+👤 Persona de guardia: Alice García
+📞 Teléfono: ***7761
+⏰ Turno: 2026-07-10T00:00:00Z → 2026-07-17T08:00:00Z
+```
+
+**Fallo de redirección**:
+```
+⚠️ Fallo en la redirección de llamadas
+📋 Grupo: Crew OnCall
+👤 Persona de guardia: Alice García
+📞 Teléfono: ***7761
+❌ Error: Zadarma API returned error or was unreachable
+🔄 Reintento: 3/10
+🕐 Hora del fallo: 2026-07-10T00:01:30Z
+```
+
+---
+
+## Autenticación con la API de Zadarma
 
 Cada petición incluye una cabecera `Authorization` con firma HMAC-SHA1:
 
 ```
-Authorization: <KEY>:<Base64(HMAC-SHA1(SECRET, método + queryString + MD5(queryString)))>
+Authorization: <API_KEY>:<Base64(HMAC-SHA1(secret, ruta+queryString+MD5(queryString)))>
 ```
 
-Algoritmo:
-1. Ordenar parámetros alfabéticamente por clave
-2. Construir query string (RFC 1738)
-3. Calcular `MD5(queryString)`
-4. Concatenar: `métodoHTTP + queryString + md5`
-5. Firmar con HMAC-SHA1 usando el API secret
-6. Codificar en Base64
-7. Anteponer `KEY:`
+Algoritmo exacto:
+1. Ordenar parámetros del cuerpo/query alfabéticamente por clave.
+2. Construir query string (URL encoding RFC 1738).
+3. Calcular `MD5(queryString)`.
+4. Data para la firma: `rutaEndpoint + queryString + md5(queryString)`.
+5. Firmar con HMAC-SHA1 usando el API secret.
+6. Codificar en Base64 la representación hex del HMAC (no los bytes raw).
+7. Header final: `Authorization: {apiKey}:{base64Signature}`.
+
+Implementado en `ZadarmaApiClient` y `ZadarmaReadonlyClient`.
 
 ---
 
-## Base de datos
+## Normalización de números de teléfono
 
-### Migración
+Antes de enviar un número a Zadarma se normaliza en `ZadarmaServiceImpl.normalizePhoneNumber()`:
 
-| Migración | Archivo | Cambios |
-|---|---|---|
-| V6 | `V6__add_zadarma_integration.sql` | Columnas Zadarma en `on_call_groups` y `shifts` |
+- Se eliminan: `+`, espacios, guiones, paréntesis, puntos
+- Se valida que solo contenga dígitos
+- Se valida longitud entre 7 y 15 dígitos (estándar E.164)
 
-### Columnas añadidas
+Ejemplos:
+| Entrada | Salida |
+|---|---|
+| `+34 653 177 761` | `34653177761` |
+| `0034 653 177 761` | `0034653177761` |
+| `653-177-761` | `653177761` |
+| `(34) 653.177.761` | `34653177761` |
 
-**Tabla `on_call_groups`**
-
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `zadarma_sip_id` | `VARCHAR(255)` | ID del SIP en Zadarma para este grupo (ej. `"921495"`). Si es null, el grupo no usa redirección. |
-| `zadarma_redirection_type` | `VARCHAR(10) DEFAULT 'sip'` | Tipo de redirección: `sip` o `pbx`. Solo `sip` implementado actualmente. |
-
-**Tabla `shifts`**
-
-| Columna | Tipo | Descripción |
-|---|---|---|
-| `redirect_status` | `VARCHAR(20)` | Estado de la redirección: `null` (pendiente), `ok`, `failed` |
-| `redirect_failed_at` | `TIMESTAMPTZ` | Cuándo falló la redirección por última vez |
-| `redirect_last_attempt_at` | `TIMESTAMPTZ` | Cuándo se intentó la redirección por última vez |
-| `redirect_retry_count` | `INT DEFAULT 0` | Número de reintentos acumulados para este turno |
-
----
-
-## Ciclo de vida de la redirección
-
-### 1. Creación de un turno futuro
-
-```
-POST /api/v1/shifts { startTime: "2026-07-10T00:00:00Z", ... }
-  → Shift guardado en BD (redirectStatus = null)
-  → CallRedirectionScheduler programa dos tareas:
-      - A las 2026-07-10T00:00:00Z → PUT /v1/sip/redirection/
-      - A las 2026-07-17T08:00:00Z → manejar fin de turno
-  → NO se llama a la API de Zadarma todavía
-```
-
-### 2. Llegada de la hora de inicio
-
-```
-TaskScheduler ejecuta redirectToOnCallPerson(shiftId)
-  → PUT /v1/sip/redirection/ { id: "921495", type: "phone", number: "34653177761" }
-  → Éxito: redirectStatus = "ok"
-  → Fallo: redirectStatus = "failed", reintento en 30s, alerta Telegram
-```
-
-### 3. Fin del turno
-
-```
-TaskScheduler ejecuta handleShiftEnd(shiftId)
-  → Busca el siguiente turno activo para el mismo grupo
-  → Si existe → redirige a la siguiente persona
-  → Si no existe → desactiva la redirección (PUT con status=off)
-```
-
-### 4. Recuperación tras reinicio del servidor
-
-```
-ApplicationReadyEvent → onStartup()
-  → Consulta todos los turnos activos y futuros de la BD
-  → Turnos activos ahora → redirige inmediatamente
-  → Turnos futuros → reprograma sus transiciones
-```
-
-### 5. Fallback periódico (cada 5 minutos)
-
-```
-@Scheduled(fixedDelay = 300000)
-  → Consulta todos los turnos actualmente activos
-  → Para cada uno: GET /v1/sip/redirection/?id=...
-  → Si el destino no coincide con el teléfono esperado → corrige (PUT)
-  → También reintenta turnos con redirectStatus = "failed"
-```
+Si una persona no tiene `phoneNumber` configurado, o el número no pasa la validación, la redirección falla con error (no es silenciosa).
 
 ---
 
@@ -184,11 +411,11 @@ ApplicationReadyEvent → onStartup()
 ### Variables de entorno
 
 ```bash
-export ZADARMA_API_KEY=your_api_key
-export ZADARMA_API_SECRET=your_api_secret
+export ZADARMA_API_KEY=tu_api_key
+export ZADARMA_API_SECRET=tu_api_secret
 ```
 
-### application.yml
+### `application.yml`
 
 ```yaml
 zadarma:
@@ -197,78 +424,62 @@ zadarma:
     secret: ${ZADARMA_API_SECRET:}
     base-url: https://api.zadarma.com
   redirect:
-    retry-max-attempts: 10
-    retry-initial-delay-seconds: 30
-    fallback-check-interval-seconds: 300
+    retry-max-attempts: 10               # Máximo de reintentos por fallo
+    retry-initial-delay-seconds: 30      # Retardo base del backoff lineal
+    fallback-check-interval-seconds: 300 # Frecuencia del checker (5 min)
 ```
-
-### Configurar un grupo para usar Zadarma
-
-Al crear o actualizar un `OnCallGroup`, asignar el SIP ID:
-
-```json
-POST /api/v1/on-call-groups
-{
-  "name": "Crew OnCall",
-  "grossPricePerDay": "150.00",
-  "zadarmaSipId": "921495",
-  "zadarmaRedirectionType": "sip"
-}
-```
-
-- `zadarmaSipId`: el ID del SIP en el panel de Zadarma (obtenido de `GET /v1/sip/` o del área personal)
-- `zadarmaRedirectionType`: `"sip"` (por defecto). En el futuro soportará `"pbx"`.
-
-Un grupo sin `zadarmaSipId` simplemente no usa redirección (compatible hacia atrás).
 
 ---
 
-## Flujo de error y reintentos
+## Resumen de todas las fuentes de disparo
 
-Cuando una redirección falla:
-
-1. El turno se marca con `redirectStatus = "failed"` y se registra la hora del fallo
-2. Se incrementa `redirectRetryCount`
-3. Se publica `ZadarmaRedirectFailedEvent`
-4. El listener envía una alerta al chat de Telegram del grupo:
-   ```
-   ⚠️ Fallo en la redirección de llamadas
-   📋 Grupo: Crew OnCall
-   👤 Persona de guardia: Alice
-   📞 Teléfono: ***7761
-   ❌ Error: Zadarma API returned error
-   🔄 Reintento: 1/10
-   ```
-5. Se programa un reintento con retardo creciente: 30s → 60s → 90s → ... hasta 10 intentos
-6. Agotados los reintentos, el fallback checker (cada 5 min) sigue intentándolo
-
-**La redirección anterior se mantiene activa** mientras se reintenta — las llamadas nunca se pierden, simplemente van al último destino configurado correctamente.
+| Disparador | Quién lo llama | Cuándo ocurre |
+|---|---|---|
+| Inicio de turno (puntual) | `TaskScheduler` | Exactamente en `shift.startTime` |
+| Turno ya activo al crear | `TaskScheduler` | 2 segundos después de la creación del turno |
+| Turno ya activo al arrancar | `TaskScheduler` | 2 segundos después del `ApplicationReadyEvent` |
+| Actualización de turno | `ShiftServiceImpl.update()` | Al guardar el PUT, cancela y reprograma |
+| Borrado de turno activo | `ShiftServiceImpl.delete()` | Al confirmar el DELETE, busca siguiente turno |
+| Fallback periódico | `@Scheduled` | Cada 5 minutos (configurable) |
+| Reintento por fallo | `TaskScheduler` (backoff lineal) | 30s, 60s, 90s… hasta 10 intentos |
 
 ---
 
-## Normalización de números de teléfono
+## Árbol de decisión de `redirectToOnCallPerson`
 
-Antes de enviar un número a Zadarma, se normaliza:
-
-- Se eliminan: `+`, espacios, guiones, paréntesis, puntos
-- Se valida que solo contenga dígitos
-- Se valida longitud entre 7 y 15 dígitos (estándar E.164)
-
-Ejemplos:
-- `+34 653 177 761` → `34653177761`
-- `0034 653 177 761` → `0034653177761`
-- `653-177-761` → `653177761`
-
-Si una persona no tiene `phoneNumber` configurado, la redirección falla y se alerta.
-
----
-
-## Monitorización
-
-La API de Zadarma tiene un límite de **100 peticiones/minuto**. El cliente registra la cabecera `X-RateLimit-Remaining` en logs para observabilidad.
-
-Para verificar conectividad con Zadarma manualmente, se puede usar el endpoint de balance:
-
-```bash
-curl -H "Authorization: <KEY>:<SIGNATURE>" https://api.zadarma.com/v1/info/balance/?format=json
 ```
+redirectToOnCallPerson(shiftId)
+  │
+  ├── ¿Existe el turno en BD?
+  │     NO → return (el turno fue borrado, ok)
+  │
+  ├── ¿El turno ya ha terminado (endTime ≤ now)?
+  │     SÍ → return (llegó tarde, skip)
+  │
+  ├── ¿El grupo tiene ZadarmaGroupConfig con sipId?
+  │     NO → return (grupo sin Zadarma, silencioso)
+  │
+  ├── ¿active = false?
+  │     SÍ → PUT /v1/sip/redirection/ { status: "off" } → return
+  │
+  ├── GET /v1/sip/redirection/?id={sipId}
+  │     → ¿destino actual == normalizar(person.phoneNumber)
+  │          AND redirectStatus != "failed"?
+  │               SÍ → return (ya está correcto, idempotente)
+  │
+  └── PUT /v1/sip/redirection/ { id: sipId, type: "phone", number: phoneNormalizado }
+        ├── Éxito → redirectStatus = "ok", retryCount = 0
+        │           publica ZadarmaRedirectSuccessEvent
+        └── Fallo → redirectStatus = "failed", retryCount++
+                    publica ZadarmaRedirectFailedEvent
+                    programa reintento si retryCount < maxRetries
+```
+
+---
+
+## Historial de migraciones relevantes
+
+| Versión | Archivo | Cambios |
+|---|---|---|
+| V6 | `V6__add_zadarma_integration.sql` | Añade `zadarma_sip_id`, `zadarma_redirection_type` a `on_call_groups`; añade campos `redirect_*` a `shifts` |
+| V8 | `V8__extract_zadarma_config.sql` | Extrae los campos Zadarma de `on_call_groups` a la nueva tabla `zadarma_configs`; añade `active`; vincula con FK `zadarma_config_id` |

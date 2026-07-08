@@ -90,7 +90,7 @@ class ShiftIntegrationTest {
                 var groupResult = mockMvc.perform(post("/api/v1/on-call-groups")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(new OnCallGroupRequest("Weekend OnCall", null,
-                                                null, null, null, null, null, null, null)))
+                                                null, null, null, null, null, null, null, null)))
                                 .with(jwt()))
                                 .andExpect(status().isCreated())
                                 .andReturn();

@@ -88,7 +88,7 @@ class OnCallGroupIntegrationTest {
                                 null, null, null,
                                 Set.of(appId),
                                 Set.of(personId),
-                                null, null);
+                                null, null, null);
 
                 var createResult = mockMvc.perform(post("/api/v1/on-call-groups")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -143,7 +143,7 @@ class OnCallGroupIntegrationTest {
                                 null, null, null,
                                 Set.of(appId),
                                 Set.<UUID>of(),
-                                null, null);
+                                null, null, null);
 
                 mockMvc.perform(put("/api/v1/on-call-groups/{id}", createdId)
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -176,7 +176,7 @@ class OnCallGroupIntegrationTest {
 
         @Test
         void create_returns400WhenNameIsBlank() throws Exception {
-                var invalidRequest = new OnCallGroupRequest("", null, null, null, null, null, null, null, null);
+                var invalidRequest = new OnCallGroupRequest("", null, null, null, null, null, null, null, null, null);
 
                 var result = mockMvc.perform(post("/api/v1/on-call-groups")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -217,7 +217,7 @@ class OnCallGroupIntegrationTest {
                                 null, null, null,
                                 Set.of(appId),
                                 Set.of(personId),
-                                null, null);
+                                null, null, null);
 
                 var createResult = mockMvc.perform(post("/api/v1/on-call-groups")
                                 .contentType(MediaType.APPLICATION_JSON)

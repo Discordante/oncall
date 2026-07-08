@@ -54,12 +54,9 @@ public class OnCallGroup {
         @JoinColumn(name = "telegram_group_config_id", referencedColumnName = "id")
         private TelegramGroupConfig telegramGroupConfig;
 
-        @Column(name = "zadarma_sip_id")
-        private String zadarmaSipId;
-
-        @Column(name = "zadarma_redirection_type")
-        @Builder.Default
-        private String zadarmaRedirectionType = "sip";
+        @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
+        @JoinColumn(name = "zadarma_config_id", referencedColumnName = "id")
+        private ZadarmaGroupConfig zadarmaConfig;
 
         @ManyToMany
         @JoinTable(name = "on_call_group_apps", joinColumns = @JoinColumn(name = "on_call_group_id"), inverseJoinColumns = @JoinColumn(name = "application_id"))

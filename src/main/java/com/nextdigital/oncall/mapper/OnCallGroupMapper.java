@@ -11,6 +11,7 @@ import com.nextdigital.oncall.entity.Application;
 import com.nextdigital.oncall.entity.OnCallGroup;
 import com.nextdigital.oncall.entity.Person;
 import com.nextdigital.oncall.entity.TelegramGroupConfig;
+import com.nextdigital.oncall.entity.ZadarmaGroupConfig;
 
 public final class OnCallGroupMapper {
 
@@ -27,6 +28,7 @@ public final class OnCallGroupMapper {
                                 .collect(Collectors.toSet());
 
                 var config = entity.getTelegramGroupConfig();
+                var zadarma = entity.getZadarmaConfig();
 
                 return new OnCallGroupResponse(
                                 entity.getId(),
@@ -39,8 +41,9 @@ public final class OnCallGroupMapper {
                                 applications,
                                 people,
                                 entity.getCreatedAt(),
-                                entity.getZadarmaSipId(),
-                                entity.getZadarmaRedirectionType(),
+                                zadarma != null ? zadarma.getSipId() : null,
+                                zadarma != null ? zadarma.getRedirectionType() : null,
+                                zadarma != null ? zadarma.getActive() : null,
                                 entity.getUpdatedAt());
         }
 
@@ -55,13 +58,8 @@ public final class OnCallGroupMapper {
                                 .build();
 
                 group.setTelegramGroupConfig(buildTelegramConfig(request));
+                group.setZadarmaConfig(buildZadarmaConfig(request));
 
-                if (request.zadarmaSipId() != null) {
-                        group.setZadarmaSipId(request.zadarmaSipId());
-                }
-                if (request.zadarmaRedirectionType() != null) {
-                        group.setZadarmaRedirectionType(request.zadarmaRedirectionType());
-                }
                 return group;
         }
 
@@ -90,11 +88,24 @@ public final class OnCallGroupMapper {
                         entity.setTelegramGroupConfig(null);
                 }
 
-                if (request.zadarmaSipId() != null) {
-                        entity.setZadarmaSipId(request.zadarmaSipId());
-                }
-                if (request.zadarmaRedirectionType() != null) {
-                        entity.setZadarmaRedirectionType(request.zadarmaRedirectionType());
+                var newZadarmaConfig = buildZadarmaConfig(request);
+                if (newZadarmaConfig != null) {
+                        var existingZadarma = entity.getZadarmaConfig();
+                        if (existingZadarma != null) {
+                                existingZadarma.setSipId(newZadarmaConfig.getSipId());
+                                if (newZadarmaConfig.getRedirectionType() != null) {
+                                        existingZadarma.setRedirectionType(newZadarmaConfig.getRedirectionType());
+                                }
+                                if (request.zadarmaActive() != null) {
+                                        existingZadarma.setActive(request.zadarmaActive());
+                                }
+                        } else {
+                                entity.setZadarmaConfig(newZadarmaConfig);
+                        }
+                } else {
+                        // zadarmaSipId is null in request -> remove config (orphanRemoval handles DB
+                        // delete)
+                        entity.setZadarmaConfig(null);
                 }
         }
 
@@ -115,6 +126,24 @@ public final class OnCallGroupMapper {
                                 .botToken(request.telegramBotToken())
                                 .groupChatId(request.telegramGroupChatId())
                                 .botEnabled(request.telegramBotEnabled() != null ? request.telegramBotEnabled() : false)
+                                .build();
+        }
+
+        /**
+         * Builds a ZadarmaGroupConfig from request fields, or returns null
+         * if zadarmaSipId is not provided.
+         */
+        private static ZadarmaGroupConfig buildZadarmaConfig(OnCallGroupRequest request) {
+                if (request.zadarmaSipId() == null) {
+                        return null;
+                }
+
+                return ZadarmaGroupConfig.builder()
+                                .sipId(request.zadarmaSipId())
+                                .redirectionType(request.zadarmaRedirectionType() != null
+                                                ? request.zadarmaRedirectionType()
+                                                : "sip")
+                                .active(request.zadarmaActive() != null ? request.zadarmaActive() : true)
                                 .build();
         }
 }

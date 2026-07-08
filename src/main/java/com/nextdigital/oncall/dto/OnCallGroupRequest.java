@@ -9,21 +9,23 @@ import jakarta.validation.constraints.NotBlank;
 
 @Schema(description = "Solicitud para crear o actualizar un grupo de guardia")
 public record OnCallGroupRequest(
-        @Schema(description = "Nombre del grupo de guardia", example = "Guardia-Sistemas-Q1") @NotBlank(message = "El nombre es obligatorio") String name,
+                @Schema(description = "Nombre del grupo de guardia", example = "Guardia-Sistemas-Q1") @NotBlank(message = "El nombre es obligatorio") String name,
 
-        @Schema(description = "Precio bruto por día de guardia", example = "150.00") BigDecimal grossPricePerDay,
+                @Schema(description = "Precio bruto por día de guardia", example = "150.00") BigDecimal grossPricePerDay,
 
-        @Schema(description = "Token del bot de Telegram para este grupo (opcional)") String telegramBotToken,
+                @Schema(description = "Token del bot de Telegram para este grupo (opcional)") String telegramBotToken,
 
-        @Schema(description = "ID del chat/grupo de Telegram donde opera el bot (opcional)") String telegramGroupChatId,
+                @Schema(description = "ID del chat/grupo de Telegram donde opera el bot (opcional)") String telegramGroupChatId,
 
-        @Schema(description = "Habilita la integración con Telegram", example = "false") Boolean telegramBotEnabled,
+                @Schema(description = "Habilita la integración con Telegram", example = "false") Boolean telegramBotEnabled,
 
-        @Schema(description = "IDs de las aplicaciones asignadas al grupo") Set<UUID> applicationIds,
+                @Schema(description = "IDs de las aplicaciones asignadas al grupo") Set<UUID> applicationIds,
 
-        @Schema(description = "IDs de las personas asignadas al grupo") Set<UUID> personIds,
+                @Schema(description = "IDs de las personas asignadas al grupo") Set<UUID> personIds,
 
-        @Schema(description = "ID del SIP en Zadarma para redirección de llamadas (opcional)", example = "921495") String zadarmaSipId,
+                @Schema(description = "ID del SIP en Zadarma para redirección de llamadas (opcional)", example = "921495") String zadarmaSipId,
 
-        @Schema(description = "Tipo de redirección: 'sip' o 'pbx' (opcional, por defecto 'sip')", example = "sip") String zadarmaRedirectionType) {
+                @Schema(description = "Tipo de redirección: 'sip' o 'pbx' (opcional, por defecto 'sip')", example = "sip") String zadarmaRedirectionType,
+
+                @Schema(description = "Activa o desactiva la redirección de llamadas (opcional, por defecto true)", example = "true") Boolean zadarmaActive) {
 }
