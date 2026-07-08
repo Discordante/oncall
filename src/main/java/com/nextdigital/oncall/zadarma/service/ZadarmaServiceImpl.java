@@ -16,6 +16,7 @@ import com.nextdigital.oncall.zadarma.client.ZadarmaApiClient;
 import com.nextdigital.oncall.zadarma.client.ZadarmaReadonlyClient;
 import com.nextdigital.oncall.zadarma.client.ZadarmaResponse;
 import com.nextdigital.oncall.zadarma.dto.SipInfoResponse;
+import com.nextdigital.oncall.zadarma.dto.ZadarmaDirectNumbersResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaSipListResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaSipRedirectionResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaStatsResponse;
@@ -251,6 +252,19 @@ public class ZadarmaServiceImpl implements ZadarmaService {
             return response;
         } catch (ZadarmaApiException e) {
             log.error("Failed to retrieve incoming call statistics: {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    @Override
+    public ZadarmaDirectNumbersResponse getDirectNumbers() {
+        try {
+            ZadarmaDirectNumbersResponse response = zadarmaReadonlyClient.getDirectNumbers();
+            log.debug("Retrieved {} direct numbers from Zadarma",
+                    response.info() != null ? response.info().size() : 0);
+            return response;
+        } catch (ZadarmaApiException e) {
+            log.error("Failed to retrieve direct numbers: {}", e.getMessage());
             throw e;
         }
     }
