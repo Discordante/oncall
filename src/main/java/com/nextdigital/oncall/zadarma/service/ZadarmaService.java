@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.nextdigital.oncall.zadarma.dto.SipInfoResponse;
+import com.nextdigital.oncall.zadarma.dto.ZadarmaDirectNumbersResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaSipRedirectionResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaStatsResponse;
 
@@ -81,4 +82,11 @@ public interface ZadarmaService {
      * @return the full Zadarma API response with status, timeframe and call records
      */
     ZadarmaStatsResponse getCallsSummary(String start, String end, String sip);
+
+    /**
+     * Returns the list of virtual (direct) numbers purchased by the user.
+     *
+     * @return the full Zadarma API response with status and direct number info list
+     */
+    ZadarmaDirectNumbersResponse getDirectNumbers();
 }

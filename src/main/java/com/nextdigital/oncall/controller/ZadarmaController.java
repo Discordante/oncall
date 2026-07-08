@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.nextdigital.oncall.dto.ApiResponse;
 import com.nextdigital.oncall.zadarma.dto.SipInfoResponse;
+import com.nextdigital.oncall.zadarma.dto.ZadarmaDirectNumbersResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaSipRedirectionResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaStatsResponse;
 import com.nextdigital.oncall.zadarma.service.ZadarmaService;
@@ -60,5 +61,18 @@ public class ZadarmaController {
             @Parameter(description = "Fin del periodo (YYYY-MM-DD HH:MM:SS)") @RequestParam(required = false) String end,
             @Parameter(description = "Filtrar por número SIP (opcional)") @RequestParam(required = false) String sip) {
         return ResponseEntity.ok(ApiResponse.success(zadarmaService.getCallsSummary(start, end, sip)));
+    }
+
+    @GetMapping("/direct-numbers")
+    @Operation(summary = "Números virtuales", description = "Obtiene la información sobre los números virtuales (directos) contratados en la cuenta de Zadarma. "
+            + "El conjunto de campos puede variar según el tipo de número. "
+            + "Posibles estados: on, parking, checking, checking_upload, reserved_on, reserved_checking, reserved_checking_upload. "
+            + "Posibles tipos: common (virtual), rufree (Moscú gratuito), order (reservado sin conectar).")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Números virtuales obtenidos correctamente"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "502", description = "Error en la comunicación con la API de Zadarma")
+    })
+    public ResponseEntity<ApiResponse<ZadarmaDirectNumbersResponse>> getDirectNumbers() {
+        return ResponseEntity.ok(ApiResponse.success(zadarmaService.getDirectNumbers()));
     }
 }

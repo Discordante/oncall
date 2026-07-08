@@ -17,6 +17,7 @@ import org.springframework.web.client.RestClientException;
 
 import com.nextdigital.oncall.config.ZadarmaConfig;
 import com.nextdigital.oncall.exception.ZadarmaApiException;
+import com.nextdigital.oncall.zadarma.dto.ZadarmaDirectNumbersResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaSipListResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaSipRedirectionResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaStatsResponse;
@@ -130,6 +131,22 @@ public class ZadarmaReadonlyClient {
         log.debug("Fetching SIP redirections from Zadarma: sipId={}", sipId != null ? sipId : "all");
 
         return executeGet("/v1/sip/redirection/", params, ZadarmaSipRedirectionResponse.class);
+    }
+
+    /**
+     * Retrieves information about the virtual (direct) numbers purchased by the
+     * user.
+     *
+     * @return the deserialized direct numbers response
+     * @throws ZadarmaApiException on network or API error
+     */
+    public ZadarmaDirectNumbersResponse getDirectNumbers() {
+        var params = new TreeMap<String, String>();
+        params.put("format", "json");
+
+        log.debug("Fetching direct numbers from Zadarma");
+
+        return executeGet("/v1/direct_numbers/", params, ZadarmaDirectNumbersResponse.class);
     }
 
     // ──────────────────────────────────────────────
