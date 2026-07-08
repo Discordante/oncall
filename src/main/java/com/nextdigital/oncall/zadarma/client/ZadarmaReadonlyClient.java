@@ -18,6 +18,7 @@ import org.springframework.web.client.RestClientException;
 import com.nextdigital.oncall.config.ZadarmaConfig;
 import com.nextdigital.oncall.exception.ZadarmaApiException;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaSipListResponse;
+import com.nextdigital.oncall.zadarma.dto.ZadarmaSipRedirectionResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaStatsResponse;
 
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,7 @@ import lombok.extern.slf4j.Slf4j;
  * </p>
  * <ul>
  * <li>{@code GET /v1/sip/} — list SIP numbers</li>
+ * <li>{@code GET /v1/sip/redirection/} — view current SIP redirections</li>
  * <li>{@code GET /v1/statistics/incoming-calls/} — incoming call statistics
  * with optional date range</li>
  * </ul>
@@ -104,6 +106,30 @@ public class ZadarmaReadonlyClient {
         log.debug("Fetching incoming call statistics: start={}, end={}, sip={}", start, end, sip);
 
         return executeGet("/v1/statistics/incoming-calls/", params, ZadarmaStatsResponse.class);
+    }
+
+    /**
+     * Retrieves the current SIP call forwarding (redirection) configuration.
+     * <p>
+     * When called without a {@code sipId}, returns redirections for all SIP
+     * numbers belonging to the account. When a specific {@code sipId} is
+     * provided, returns only the redirection for that SIP.
+     * </p>
+     *
+     * @param sipId optional specific SIP ID to filter by, or null for all
+     * @return the deserialized redirection response with info list
+     * @throws ZadarmaApiException on network or API error
+     */
+    public ZadarmaSipRedirectionResponse getSipRedirections(String sipId) {
+        var params = new TreeMap<String, String>();
+        params.put("format", "json");
+        if (sipId != null && !sipId.isBlank()) {
+            params.put("id", sipId);
+        }
+
+        log.debug("Fetching SIP redirections from Zadarma: sipId={}", sipId != null ? sipId : "all");
+
+        return executeGet("/v1/sip/redirection/", params, ZadarmaSipRedirectionResponse.class);
     }
 
     // ──────────────────────────────────────────────
@@ -206,7 +232,9 @@ public class ZadarmaReadonlyClient {
     }
 
     /**
-     * URL-encodes a string per RFC 1738.
+     * URL-encodes a string per RFC 1738 (application/x-www-form-urlencoded).
+     * Spaces are encoded as "+" (not "%20") to match PHP's
+     * {@code http_build_query} with {@code PHP_QUERY_RFC1738}.
      */
     private static String encode(String value) {
         var sb = new StringBuilder();
@@ -215,6 +243,8 @@ public class ZadarmaReadonlyClient {
                     || (c >= '0' && c <= '9')
                     || c == '.' || c == '-' || c == '_' || c == '~') {
                 sb.append(c);
+            } else if (c == ' ') {
+                sb.append('+');
             } else {
                 byte[] bytes = String.valueOf(c).getBytes(StandardCharsets.UTF_8);
                 for (byte b : bytes) {

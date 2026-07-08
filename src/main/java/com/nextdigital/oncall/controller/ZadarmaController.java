@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.nextdigital.oncall.dto.ApiResponse;
 import com.nextdigital.oncall.zadarma.dto.SipInfoResponse;
+import com.nextdigital.oncall.zadarma.dto.ZadarmaSipRedirectionResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaStatsResponse;
 import com.nextdigital.oncall.zadarma.service.ZadarmaService;
 
@@ -35,6 +36,17 @@ public class ZadarmaController {
     })
     public ResponseEntity<ApiResponse<List<SipInfoResponse>>> getSips() {
         return ResponseEntity.ok(ApiResponse.success(zadarmaService.getSipList()));
+    }
+
+    @GetMapping("/sip-redirections")
+    @Operation(summary = "Reenvíos SIP", description = "Obtiene la configuración actual de reenvío de llamadas (redirección) para todos los números SIP de la cuenta, o filtrado por un SIP concreto")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Reenvíos obtenidos correctamente"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "502", description = "Error en la comunicación con la API de Zadarma")
+    })
+    public ResponseEntity<ApiResponse<ZadarmaSipRedirectionResponse>> getSipRedirections(
+            @Parameter(description = "ID de SIP específico (opcional). Si no se indica, se devuelven todos los SIP") @RequestParam(required = false) String id) {
+        return ResponseEntity.ok(ApiResponse.success(zadarmaService.getSipRedirections(id)));
     }
 
     @GetMapping("/calls-summary")
