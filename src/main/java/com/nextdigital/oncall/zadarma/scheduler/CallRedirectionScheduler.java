@@ -164,10 +164,11 @@ public class CallRedirectionScheduler {
             return;
         }
 
-        // If the group doesn't use Zadarma (no sipId), skip silently
-        String sipId = shift.getOnCallGroup().getZadarmaSipId();
+        // If the group doesn't use Zadarma (no config or no sipId), skip silently
+        var zadarmaConfig = shift.getOnCallGroup().getZadarmaConfig();
+        String sipId = zadarmaConfig != null ? zadarmaConfig.getSipId() : null;
         if (sipId == null || sipId.isBlank()) {
-            log.debug("Group '{}' has no zadarmaSipId — skipping redirect for shift {}",
+            log.debug("Group '{}' has no Zadarma config — skipping redirect for shift {}",
                     shift.getOnCallGroup().getName(), shiftId);
             return;
         }
