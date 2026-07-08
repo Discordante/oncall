@@ -17,6 +17,7 @@ import com.nextdigital.oncall.zadarma.client.ZadarmaReadonlyClient;
 import com.nextdigital.oncall.zadarma.client.ZadarmaResponse;
 import com.nextdigital.oncall.zadarma.dto.SipInfoResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaSipListResponse;
+import com.nextdigital.oncall.zadarma.dto.ZadarmaSipRedirectionResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaStatsResponse;
 
 import lombok.RequiredArgsConstructor;
@@ -208,6 +209,19 @@ public class ZadarmaServiceImpl implements ZadarmaService {
             return enriched;
         } catch (ZadarmaApiException e) {
             log.error("Failed to retrieve SIP list: {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    @Override
+    public ZadarmaSipRedirectionResponse getSipRedirections(String sipId) {
+        try {
+            ZadarmaSipRedirectionResponse response = zadarmaReadonlyClient.getSipRedirections(sipId);
+            log.debug("Received {} SIP redirection entries from Zadarma",
+                    response.info() != null ? response.info().size() : 0);
+            return response;
+        } catch (ZadarmaApiException e) {
+            log.error("Failed to retrieve SIP redirections: {}", e.getMessage());
             throw e;
         }
     }

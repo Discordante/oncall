@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.nextdigital.oncall.zadarma.dto.SipInfoResponse;
+import com.nextdigital.oncall.zadarma.dto.ZadarmaSipRedirectionResponse;
 import com.nextdigital.oncall.zadarma.dto.ZadarmaStatsResponse;
 
 /**
@@ -62,6 +63,14 @@ public interface ZadarmaService {
      * @return list of {@link SipInfoResponse} with sipId and optional groupName
      */
     java.util.List<SipInfoResponse> getSipList();
+
+    /**
+     * Returns the current SIP call forwarding (redirection) configuration.
+     *
+     * @param sipId optional specific SIP ID to filter by, or null for all
+     * @return the full Zadarma API response with status and redirection info list
+     */
+    ZadarmaSipRedirectionResponse getSipRedirections(String sipId);
 
     /**
      * Returns the raw incoming-call statistics from Zadarma for the given period.

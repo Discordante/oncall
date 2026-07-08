@@ -250,8 +250,10 @@ public class ZadarmaApiClient {
     }
 
     /**
-     * URL-encodes a string per RFC 1738.
+     * URL-encodes a string per RFC 1738 (application/x-www-form-urlencoded).
      * Only alphanumeric, ".", "-", "_", and "~" are left unencoded.
+     * Spaces are encoded as "+" (not "%20") to match PHP's
+     * {@code http_build_query} with {@code PHP_QUERY_RFC1738}.
      */
     private static String encode(String value) {
         var sb = new StringBuilder();
@@ -260,6 +262,8 @@ public class ZadarmaApiClient {
                     || (c >= '0' && c <= '9')
                     || c == '.' || c == '-' || c == '_' || c == '~') {
                 sb.append(c);
+            } else if (c == ' ') {
+                sb.append('+');
             } else {
                 byte[] bytes = String.valueOf(c).getBytes(StandardCharsets.UTF_8);
                 for (byte b : bytes) {
