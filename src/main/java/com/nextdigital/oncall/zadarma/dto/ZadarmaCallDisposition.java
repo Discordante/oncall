@@ -1,5 +1,6 @@
 package com.nextdigital.oncall.zadarma.dto;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -7,7 +8,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 /**
  * Possible values for the {@code disposition} field in a Zadarma call record.
  *
- * @see <a href="https://zadarma.com/es/support/api/#statistics">Zadarma API docs</a>
+ * @see <a href="https://zadarma.com/es/support/api/#statistics">Zadarma API
+ *      docs</a>
  */
 @Schema(description = "Estado de la llamada")
 public enum ZadarmaCallDisposition {
@@ -65,6 +67,7 @@ public enum ZadarmaCallDisposition {
      * @param raw the raw value from the API
      * @return the matching enum constant, or {@code null} if unknown
      */
+    @JsonCreator
     public static ZadarmaCallDisposition fromValue(String raw) {
         if (raw == null) {
             return null;
