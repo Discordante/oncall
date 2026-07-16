@@ -161,9 +161,11 @@ public class ZadarmaServiceImpl implements ZadarmaService {
         try {
             ZadarmaResponse response = zadarmaApiClient.getSipRedirection(sipId);
             if (response.isSuccess()) {
-                String dest = response.destination();
+                // destination_value holds the actual phone number;
+                // destination holds the type ("phone", "sip", etc.)
+                String dest = response.destinationValue();
                 if (dest == null) {
-                    dest = response.destinationValue();
+                    dest = response.destination();
                 }
                 return Optional.ofNullable(dest);
             }
