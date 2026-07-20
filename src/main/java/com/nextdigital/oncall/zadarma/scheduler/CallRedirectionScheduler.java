@@ -180,9 +180,15 @@ public class CallRedirectionScheduler {
         String expectedPhone = zadarmaService.normalizePhoneNumber(
                 shift.getPerson().getPhoneNumber());
 
-        boolean alreadyCorrect = currentDest.isPresent()
+        // Normalize currentDest the same way as expectedPhone so formats like
+        // "+34666123456" vs "34666123456" don't cause a false mismatch.
+        String normalizedCurrentDest = currentDest.isPresent()
+                ? zadarmaService.normalizePhoneNumber(currentDest.get())
+                : null;
+
+        boolean alreadyCorrect = normalizedCurrentDest != null
                 && expectedPhone != null
-                && expectedPhone.equals(currentDest.get())
+                && expectedPhone.equals(normalizedCurrentDest)
                 && !"failed".equals(shift.getRedirectStatus());
 
         if (alreadyCorrect) {
