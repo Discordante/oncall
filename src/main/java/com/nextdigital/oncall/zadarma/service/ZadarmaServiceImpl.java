@@ -126,24 +126,6 @@ public class ZadarmaServiceImpl implements ZadarmaService {
         return disableRedirectionBySipId(group.getName(), zadarmaConfig.getSipId());
     }
 
-    private boolean disableRedirectionBySipId(String groupName, String sipId) {
-        try {
-            ZadarmaResponse response = zadarmaApiClient.disableSipRedirection(sipId);
-            if (response.isSuccess()) {
-                log.info("Call redirection disabled for group '{}' (SIP {})", groupName, sipId);
-                return true;
-            } else {
-                log.error("Failed to disable redirection for group '{}': status={}, message={}",
-                        groupName, response.status(), response.message());
-                return false;
-            }
-        } catch (ZadarmaApiException e) {
-            log.error("Zadarma API call failed while disabling redirection for group '{}': {}",
-                    groupName, e.getMessage());
-            return false;
-        }
-    }
-
     @Override
     public Optional<String> getCurrentRedirectionDestination(UUID groupId) {
         var group = groupRepository.findById(groupId).orElse(null);
@@ -159,16 +141,21 @@ public class ZadarmaServiceImpl implements ZadarmaService {
         String sipId = zadarmaConfig.getSipId();
 
         try {
-            ZadarmaResponse response = zadarmaApiClient.getSipRedirection(sipId);
-            if (response.isSuccess()) {
-                // destination_value holds the actual phone number;
-                // destination holds the type ("phone", "sip", etc.)
-                String dest = response.destinationValue();
+            // Usamos ZadarmaReadonlyClient porque la respuesta tiene un array "info"
+            // y ZadarmaResponse (de ZadarmaApiClient) no puede mapearlo correctamente.
+            var response = zadarmaReadonlyClient.getSipRedirections(sipId);
+            if ("success".equals(response.status()) && response.info() != null && !response.info().isEmpty()) {
+                var info = response.info().getFirst();
+                String dest = info.destinationValue();
                 if (dest == null) {
-                    dest = response.destination();
+                    dest = info.destination();
                 }
+                log.debug("Current redirection for SIP {}: destination={}, destinationValue={}",
+                        sipId, info.destination(), info.destinationValue());
                 return Optional.ofNullable(dest);
             }
+            log.warn("Failed to get redirection status for group '{}' (SIP {}): status={}, info={}",
+                    group.getName(), sipId, response.status(), response.info());
             return Optional.empty();
         } catch (ZadarmaApiException e) {
             log.warn("Failed to get redirection status for group '{}': {}", group.getName(), e.getMessage());
@@ -195,10 +182,6 @@ public class ZadarmaServiceImpl implements ZadarmaService {
         }
         return normalized;
     }
-
-    // ──────────────────────────────────────────────
-    // Read-only analytics queries
-    // ──────────────────────────────────────────────
 
     @Override
     public List<SipInfoResponse> getSipList() {
@@ -231,6 +214,10 @@ public class ZadarmaServiceImpl implements ZadarmaService {
             throw e;
         }
     }
+
+    // ──────────────────────────────────────────────
+    // Read-only analytics queries
+    // ──────────────────────────────────────────────
 
     @Override
     public ZadarmaSipRedirectionResponse getSipRedirections(String sipId) {
@@ -268,6 +255,24 @@ public class ZadarmaServiceImpl implements ZadarmaService {
         } catch (ZadarmaApiException e) {
             log.error("Failed to retrieve direct numbers: {}", e.getMessage());
             throw e;
+        }
+    }
+
+    private boolean disableRedirectionBySipId(String groupName, String sipId) {
+        try {
+            ZadarmaResponse response = zadarmaApiClient.disableSipRedirection(sipId);
+            if (response.isSuccess()) {
+                log.info("Call redirection disabled for group '{}' (SIP {})", groupName, sipId);
+                return true;
+            } else {
+                log.error("Failed to disable redirection for group '{}': status={}, message={}",
+                        groupName, response.status(), response.message());
+                return false;
+            }
+        } catch (ZadarmaApiException e) {
+            log.error("Zadarma API call failed while disabling redirection for group '{}': {}",
+                    groupName, e.getMessage());
+            return false;
         }
     }
 }

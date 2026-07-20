@@ -49,12 +49,23 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 public class CallRedirectionScheduler {
 
+    private static boolean isActive(Shift shift, OffsetDateTime now) {
+        return !shift.getStartTime().isAfter(now) && shift.getEndTime().isAfter(now);
+    }
+
+    private static void cancelFuture(ScheduledFuture<?> future) {
+        if (future != null && !future.isCancelled() && !future.isDone()) {
+            future.cancel(false);
+        }
+    }
+
     private final TaskScheduler taskScheduler;
     private final ZadarmaService zadarmaService;
     private final ShiftRepository shiftRepository;
-    private final ApplicationEventPublisher eventPublisher;
-    private final ZadarmaConfig config;
 
+    private final ApplicationEventPublisher eventPublisher;
+
+    private final ZadarmaConfig config;
     /**
      * Self-reference to ensure {@link #redirectToOnCallPerson} is called
      * through the Spring AOP proxy so that {@code @Transactional} is applied.
@@ -65,16 +76,17 @@ public class CallRedirectionScheduler {
     @Autowired
     private CallRedirectionScheduler self;
 
+    // ──────────────────────────────────────────────
+    // Public API (called by ShiftServiceImpl)
+    // ──────────────────────────────────────────────
+
     /**
      * Maps shiftId → {startTask, endTask} futures for cancellation on
      * update/delete.
      */
     private final Map<UUID, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
-    private final Map<UUID, ScheduledFuture<?>> endTasks = new ConcurrentHashMap<>();
 
-    // ──────────────────────────────────────────────
-    // Public API (called by ShiftServiceImpl)
-    // ──────────────────────────────────────────────
+    private final Map<UUID, ScheduledFuture<?>> endTasks = new ConcurrentHashMap<>();
 
     /**
      * Schedules redirection transitions for a shift.
@@ -112,6 +124,10 @@ public class CallRedirectionScheduler {
         }
     }
 
+    // ──────────────────────────────────────────────
+    // Redirection logic
+    // ──────────────────────────────────────────────
+
     /**
      * Cancels all scheduled transitions for a shift.
      * Called before shift update or on shift delete.
@@ -140,7 +156,7 @@ public class CallRedirectionScheduler {
     }
 
     // ──────────────────────────────────────────────
-    // Redirection logic
+    // Failure handling
     // ──────────────────────────────────────────────
 
     /**
@@ -191,6 +207,11 @@ public class CallRedirectionScheduler {
                 && expectedPhone.equals(normalizedCurrentDest)
                 && !"failed".equals(shift.getRedirectStatus());
 
+        log.info(
+                "Redirection check for shift {}: currentDest='{}', normalizedCurrentDest='{}', expectedPhone='{}', redirectStatus='{}', alreadyCorrect={}",
+                shiftId, currentDest.orElse("(empty)"), normalizedCurrentDest, expectedPhone,
+                shift.getRedirectStatus(), alreadyCorrect);
+
         if (alreadyCorrect) {
             log.debug("Shift {} already correctly redirected to {} — skipping",
                     shiftId, shift.getPerson().getName());
@@ -230,6 +251,10 @@ public class CallRedirectionScheduler {
         shiftRepository.save(shift);
     }
 
+    // ──────────────────────────────────────────────
+    // Startup recovery
+    // ──────────────────────────────────────────────
+
     /**
      * Handles a shift ending. The redirection is NOT changed here — the next
      * shift's own start handler ({@link #redirectToOnCallPerson}) will take care
@@ -248,8 +273,65 @@ public class CallRedirectionScheduler {
     }
 
     // ──────────────────────────────────────────────
-    // Failure handling
+    // Periodic fallback checker
     // ──────────────────────────────────────────────
+
+    /**
+     * On application startup, reschedule all pending transitions from the database.
+     * This handles server restarts gracefully.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    @Transactional(readOnly = true)
+    public void onStartup() {
+        log.info("Recovering scheduled shift transitions on startup...");
+        OffsetDateTime now = OffsetDateTime.now();
+
+        var allFutureShifts = shiftRepository.findAllActiveAndFuture(now);
+        int activeCount = 0;
+        int futureCount = 0;
+
+        for (var shift : allFutureShifts) {
+            if (isActive(shift, now)) {
+                activeCount++;
+            } else {
+                futureCount++;
+            }
+            scheduleShiftTransitions(shift);
+        }
+
+        log.info("Startup recovery complete: evaluated {} active shifts and {} future shifts — transitions scheduled",
+                activeCount, futureCount);
+    }
+
+    // ──────────────────────────────────────────────
+    // Utilities
+    // ──────────────────────────────────────────────
+
+    /**
+     * Every N minutes, verify all currently active shifts have the correct
+     * Zadarma redirection. Fixes any drift caused by external changes or
+     * missed transitions.
+     */
+    @Scheduled(fixedDelayString = "#{@zadarmaConfig.redirect.fallbackCheckIntervalSeconds * 1000}")
+    @Transactional
+    public void fallbackCheck() {
+        OffsetDateTime now = OffsetDateTime.now();
+        var activeShifts = shiftRepository.findCurrentlyActive(now);
+
+        if (activeShifts.isEmpty()) {
+            return;
+        }
+
+        log.debug("Fallback check: verifying {} active shifts", activeShifts.size());
+
+        for (var shift : activeShifts) {
+            try {
+                self.redirectToOnCallPerson(shift.getId());
+            } catch (Exception e) {
+                log.warn("Fallback check error for shift {}: {}", shift.getId(), e.getMessage());
+            }
+        }
+    }
 
     private void handleRedirectFailure(Shift shift) {
         int retryCount = shift.getRedirectRetryCount();
@@ -287,81 +369,6 @@ public class CallRedirectionScheduler {
         } else {
             log.error("Shift {} redirect FAILED after {} attempts — will be retried by fallback checker only",
                     shift.getId(), maxRetries);
-        }
-    }
-
-    // ──────────────────────────────────────────────
-    // Startup recovery
-    // ──────────────────────────────────────────────
-
-    /**
-     * On application startup, reschedule all pending transitions from the database.
-     * This handles server restarts gracefully.
-     */
-    @EventListener(ApplicationReadyEvent.class)
-    @Transactional(readOnly = true)
-    public void onStartup() {
-        log.info("Recovering scheduled shift transitions on startup...");
-        OffsetDateTime now = OffsetDateTime.now();
-
-        var allFutureShifts = shiftRepository.findAllActiveAndFuture(now);
-        int activeCount = 0;
-        int futureCount = 0;
-
-        for (var shift : allFutureShifts) {
-            if (isActive(shift, now)) {
-                activeCount++;
-            } else {
-                futureCount++;
-            }
-            scheduleShiftTransitions(shift);
-        }
-
-        log.info("Startup recovery complete: evaluated {} active shifts and {} future shifts — transitions scheduled",
-                activeCount, futureCount);
-    }
-
-    // ──────────────────────────────────────────────
-    // Periodic fallback checker
-    // ──────────────────────────────────────────────
-
-    /**
-     * Every N minutes, verify all currently active shifts have the correct
-     * Zadarma redirection. Fixes any drift caused by external changes or
-     * missed transitions.
-     */
-    @Scheduled(fixedDelayString = "#{@zadarmaConfig.redirect.fallbackCheckIntervalSeconds * 1000}")
-    @Transactional
-    public void fallbackCheck() {
-        OffsetDateTime now = OffsetDateTime.now();
-        var activeShifts = shiftRepository.findCurrentlyActive(now);
-
-        if (activeShifts.isEmpty()) {
-            return;
-        }
-
-        log.debug("Fallback check: verifying {} active shifts", activeShifts.size());
-
-        for (var shift : activeShifts) {
-            try {
-                self.redirectToOnCallPerson(shift.getId());
-            } catch (Exception e) {
-                log.warn("Fallback check error for shift {}: {}", shift.getId(), e.getMessage());
-            }
-        }
-    }
-
-    // ──────────────────────────────────────────────
-    // Utilities
-    // ──────────────────────────────────────────────
-
-    private static boolean isActive(Shift shift, OffsetDateTime now) {
-        return !shift.getStartTime().isAfter(now) && shift.getEndTime().isAfter(now);
-    }
-
-    private static void cancelFuture(ScheduledFuture<?> future) {
-        if (future != null && !future.isCancelled() && !future.isDone()) {
-            future.cancel(false);
         }
     }
 }
