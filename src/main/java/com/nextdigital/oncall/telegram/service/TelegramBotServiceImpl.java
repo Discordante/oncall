@@ -96,23 +96,43 @@ public class TelegramBotServiceImpl implements TelegramBotService {
             return new TelegramLinkResponse(false, "Usuario no encontrado.");
         }
 
-        // If another person already has this chatId, unlink them first
-        personRepository.findByTelegramChatId(pendingLink.getChatId())
+        // If another person already has this Telegram user id, unlink them first
+        personRepository.findByTelegramUserId(pendingLink.getUserId())
+                .filter(existing -> !existing.getId().equals(personId))
                 .ifPresent(existing -> {
+                    existing.setTelegramUserId(null);
                     existing.setTelegramChatId(null);
                     existing.setTelegramLinkedAt(null);
                     personRepository.save(existing);
-                    log.info("Unlinked Telegram chat {} from previous person {}",
-                            pendingLink.getChatId(), existing.getId());
+                    log.info("Unlinked Telegram user {} from previous person {}",
+                            pendingLink.getUserId(), existing.getId());
                 });
 
-        person.setTelegramChatId(pendingLink.getChatId());
+        // Only a private chat can be used as a direct-message destination.
+        // If /start was sent from a group, the chat id is the group's id and
+        // must NOT be stored as the person's chat id.
+        if ("private".equals(pendingLink.getChatType())) {
+            personRepository.findByTelegramChatId(pendingLink.getChatId())
+                    .filter(existing -> !existing.getId().equals(personId))
+                    .ifPresent(existing -> {
+                        existing.setTelegramChatId(null);
+                        personRepository.save(existing);
+                        log.info("Unlinked Telegram chat {} from previous person {}",
+                                pendingLink.getChatId(), existing.getId());
+                    });
+            person.setTelegramChatId(pendingLink.getChatId());
+        } else {
+            person.setTelegramChatId(null);
+        }
+
+        person.setTelegramUserId(pendingLink.getUserId());
         person.setTelegramLinkedAt(OffsetDateTime.now());
         personRepository.save(person);
 
         pendingLinkRepository.delete(pendingLink);
 
-        log.info("Telegram account linked: person={}, chatId={}", personId, pendingLink.getChatId());
+        log.info("Telegram account linked: person={}, userId={}, chatId={}",
+                personId, pendingLink.getUserId(), person.getTelegramChatId());
         return new TelegramLinkResponse(true, "Cuenta de Telegram vinculada correctamente.");
     }
 
@@ -194,15 +214,17 @@ public class TelegramBotServiceImpl implements TelegramBotService {
 
         var message = update.message();
         var chatId = String.valueOf(message.chat().id());
+        var chatType = message.chat().type();
         var text = message.text().trim();
         var fromId = String.valueOf(message.from().id());
 
-        log.debug("Received message from {} in group chat {}: {}", fromId, chatId, text);
+        log.debug("Received message from user {} in chat {} (group={}, type={}): {}",
+                fromId, chatId, groupId, chatType, text);
 
         // /start must be handled before the generic command router,
         // otherwise isCommand() catches it and handleStartCommand never runs
         if (text.equalsIgnoreCase("/start")) {
-            handleStartCommand(bot.botToken(), chatId, fromId);
+            handleStartCommand(bot.botToken(), chatId, fromId, chatType);
         } else if (message.isCommand()) {
             var response = commandRouter.route(text, groupId, chatId, fromId);
             if (response != null) {
@@ -211,19 +233,40 @@ public class TelegramBotServiceImpl implements TelegramBotService {
         }
     }
 
-    private void handleStartCommand(String botToken, String chatId, String fromId) {
-        var alreadyLinked = personRepository.findByTelegramChatId(chatId);
-        if (alreadyLinked.isPresent()) {
-            var person = alreadyLinked.get();
+    /**
+     * Handles /start. Links are keyed on the Telegram <b>user id</b>
+     * ({@code message.from.id}), not the chat id, because in group chats every
+     * member shares the same chat id.
+     *
+     * @param botToken bot token of the group's bot
+     * @param chatId   chat where the command was sent (private chat or group)
+     * @param fromId   Telegram user id of the sender
+     * @param chatType Telegram chat type ("private", "group", "supergroup")
+     */
+    private void handleStartCommand(String botToken, String chatId, String fromId, String chatType) {
+        var linkedPerson = personRepository.findByTelegramUserId(fromId).orElse(null);
+        if (linkedPerson != null) {
+            // Self-heal: if the user writes to the bot privately, remember their
+            // private chat id so personal notifications can be delivered by DM.
+            if ("private".equals(chatType) && !chatId.equals(linkedPerson.getTelegramChatId())) {
+                linkedPerson.setTelegramChatId(chatId);
+                personRepository.save(linkedPerson);
+            }
             apiClient.sendMessage(botToken, chatId,
-                    "✅ Ya tienes tu cuenta vinculada, " + person.getName() + ".\n"
+                    "✅ Ya tienes tu cuenta vinculada, " + linkedPerson.getName() + ".\n"
                             + "Usa /info para ver los comandos disponibles.");
             return;
         }
 
+        // Remove any stale pending link for this Telegram user so only one
+        // code is valid at a time
+        pendingLinkRepository.findByUserId(fromId).ifPresent(pendingLinkRepository::delete);
+
         var code = UUID.randomUUID().toString().replace("-", "");
         var pendingLink = TelegramPendingLink.builder()
+                .userId(fromId)
                 .chatId(chatId)
+                .chatType(chatType)
                 .linkCode(code)
                 .expiresAt(OffsetDateTime.now().plusMinutes(15))
                 .build();

@@ -61,8 +61,10 @@ public class CommandRouter {
             return null;
         }
 
-        // Check if user is linked
-        var isLinked = personRepository.findByTelegramChatId(chatId).isPresent();
+        // Check if user is linked. Identity is the Telegram user id (fromId),
+        // which is unique per Telegram account; chat ids are shared by all
+        // members of a group and cannot identify a person.
+        var isLinked = personRepository.findByTelegramUserId(fromId).isPresent();
         if (!isLinked && !command.equals("/start")) {
             return "❌ No tienes tu cuenta vinculada.\n\n"
                     + "Escribe /start para obtener un código de verificación "

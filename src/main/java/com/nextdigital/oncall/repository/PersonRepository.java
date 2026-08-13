@@ -18,5 +18,7 @@ public interface PersonRepository extends JpaRepository<Person, UUID> {
 
     Optional<Person> findByTelegramChatId(String telegramChatId);
 
+    Optional<Person> findByTelegramUserId(String telegramUserId);
+
     Optional<Person> findByTelegramLinkCode(String telegramLinkCode);
 }

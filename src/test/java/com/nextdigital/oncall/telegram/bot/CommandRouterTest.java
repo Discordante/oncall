@@ -67,8 +67,8 @@ class CommandRouterTest {
 
     @Test
     void route_infoCommand_returnsHelp() {
-        when(personRepository.findByTelegramChatId(linkedChatId))
-                .thenReturn(Optional.of(Person.builder().id(UUID.randomUUID()).telegramChatId(linkedChatId).build()));
+        when(personRepository.findByTelegramUserId(fromId))
+                .thenReturn(Optional.of(Person.builder().id(UUID.randomUUID()).telegramUserId(fromId).build()));
         when(infoCommand.execute(new String[] {}, groupId, linkedChatId, fromId))
                 .thenReturn("🤖 *Comandos disponibles:*");
 
@@ -80,8 +80,8 @@ class CommandRouterTest {
 
     @Test
     void route_turnosCommand_returnsSchedule() {
-        when(personRepository.findByTelegramChatId(linkedChatId))
-                .thenReturn(Optional.of(Person.builder().id(UUID.randomUUID()).telegramChatId(linkedChatId).build()));
+        when(personRepository.findByTelegramUserId(fromId))
+                .thenReturn(Optional.of(Person.builder().id(UUID.randomUUID()).telegramUserId(fromId).build()));
         when(scheduleCommand.execute(new String[] {}, groupId, linkedChatId, fromId))
                 .thenReturn("📅 *Guardias*");
 
@@ -93,8 +93,8 @@ class CommandRouterTest {
 
     @Test
     void route_unknownCommand_returnsError() {
-        when(personRepository.findByTelegramChatId(linkedChatId))
-                .thenReturn(Optional.of(Person.builder().id(UUID.randomUUID()).telegramChatId(linkedChatId).build()));
+        when(personRepository.findByTelegramUserId(fromId))
+                .thenReturn(Optional.of(Person.builder().id(UUID.randomUUID()).telegramUserId(fromId).build()));
 
         var result = router.route("/unknown", groupId, linkedChatId, fromId);
 
@@ -104,9 +104,10 @@ class CommandRouterTest {
 
     @Test
     void route_unlinkedUser_cannotUseInfo() {
-        when(personRepository.findByTelegramChatId(unlinkedChatId)).thenReturn(Optional.empty());
+        var unlinkedFromId = "999999999";
+        when(personRepository.findByTelegramUserId(unlinkedFromId)).thenReturn(Optional.empty());
 
-        var result = router.route("/info", groupId, unlinkedChatId, fromId);
+        var result = router.route("/info", groupId, unlinkedChatId, unlinkedFromId);
 
         assertThat(result).isNotNull();
         assertThat(result).contains("No tienes tu cuenta vinculada");
@@ -114,9 +115,10 @@ class CommandRouterTest {
 
     @Test
     void route_unlinkedUser_cannotUseTurnos() {
-        when(personRepository.findByTelegramChatId(unlinkedChatId)).thenReturn(Optional.empty());
+        var unlinkedFromId = "999999999";
+        when(personRepository.findByTelegramUserId(unlinkedFromId)).thenReturn(Optional.empty());
 
-        var result = router.route("/turnos", groupId, unlinkedChatId, fromId);
+        var result = router.route("/turnos", groupId, unlinkedChatId, unlinkedFromId);
 
         assertThat(result).isNotNull();
         assertThat(result).contains("No tienes tu cuenta vinculada");
@@ -124,8 +126,8 @@ class CommandRouterTest {
 
     @Test
     void route_turnosWithArgs_passesArguments() {
-        when(personRepository.findByTelegramChatId(linkedChatId))
-                .thenReturn(Optional.of(Person.builder().id(UUID.randomUUID()).telegramChatId(linkedChatId).build()));
+        when(personRepository.findByTelegramUserId(fromId))
+                .thenReturn(Optional.of(Person.builder().id(UUID.randomUUID()).telegramUserId(fromId).build()));
         when(scheduleCommand.execute(new String[] { "arg1" }, groupId, linkedChatId, fromId))
                 .thenReturn("📅 Result");
 

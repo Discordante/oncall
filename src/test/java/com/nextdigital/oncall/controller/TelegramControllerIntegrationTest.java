@@ -71,9 +71,11 @@ class TelegramControllerIntegrationTest {
                 validCode = UUID.randomUUID().toString().replace("-", "");
                 expiredCode = UUID.randomUUID().toString().replace("-", "");
 
-                // Create a valid pending link
+                // Create a valid pending link (requested from a private chat)
                 var validLink = TelegramPendingLink.builder()
+                                .userId("111222333")
                                 .chatId("123456789")
+                                .chatType("private")
                                 .linkCode(validCode)
                                 .expiresAt(java.time.OffsetDateTime.now().plusHours(1))
                                 .build();
@@ -81,7 +83,9 @@ class TelegramControllerIntegrationTest {
 
                 // Create an expired pending link
                 var expiredLink = TelegramPendingLink.builder()
+                                .userId("999888777")
                                 .chatId("987654321")
+                                .chatType("private")
                                 .linkCode(expiredCode)
                                 .expiresAt(java.time.OffsetDateTime.now().minusHours(1))
                                 .build();
@@ -149,6 +153,10 @@ class TelegramControllerIntegrationTest {
                 assertThat(response.data()).isNotNull();
                 assertThat(response.data().success()).isTrue();
                 assertThat(response.data().message()).contains("vinculada");
+
+                var linkedPerson = personRepository.findByEmail(TEST_EMAIL).orElseThrow();
+                assertThat(linkedPerson.getTelegramUserId()).isEqualTo("111222333");
+                assertThat(linkedPerson.getTelegramChatId()).isEqualTo("123456789");
         }
 
         @Test

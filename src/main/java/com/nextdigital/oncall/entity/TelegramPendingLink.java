@@ -30,8 +30,28 @@ public class TelegramPendingLink {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    /**
+     * Telegram user id of the person who requested the code
+     * (message.from.id). Unique across all chats, unlike the chat id,
+     * which is shared by all members of a group.
+     */
+    @Column(name = "user_id", nullable = false)
+    private String userId;
+
+    /**
+     * Chat where /start was sent (private chat or group).
+     * Used as the reply destination while the code is pending.
+     */
     @Column(name = "chat_id", nullable = false)
     private String chatId;
+
+    /**
+     * Telegram chat type of the chat where /start was sent
+     * ("private", "group", "supergroup"). Only private chats can be used
+     * as a direct-message destination.
+     */
+    @Column(name = "chat_type")
+    private String chatType;
 
     @Column(name = "link_code", nullable = false, unique = true)
     private String linkCode;
