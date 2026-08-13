@@ -32,6 +32,7 @@ Sistema de gestión de guardias y turnos. Permite administrar aplicaciones, pers
 
 ```
 src/main/java/com/nextdigital/oncall/
+├── audit/           → Auditoría de acciones (listener Hibernate, actor JWT, job de retención)
 ├── config/          → Beans, configuración, security
 ├── controller/      → REST controllers
 ├── dto/             → Request/Response DTOs
@@ -158,6 +159,7 @@ Hibernate opera con `ddl-auto=validate`: el esquema lo gestiona exclusivamente F
 | `on_call_group_people` | Relación ManyToMany grupos ↔ personas |
 | `shifts` | Turnos reales con rango de tiempo y CHECK `start_time < end_time` |
 | `on_call_group_price_history` | Historial de precios de grupos con rangos de vigencia (`effective_from`/`effective_to`) |
+| `audit_logs` | Registro de auditoría append-only: cada CREATE/UPDATE/DELETE con su actor y diff JSONB |
 
 > **V2**: La migración `V2__add_on_call_group_price_history.sql` añade la tabla de historial de precios
 > y migra automáticamente los precios actuales de cada grupo como su primer registro histórico.
@@ -167,6 +169,8 @@ Hibernate opera con `ddl-auto=validate`: el esquema lo gestiona exclusivamente F
 > **V6**: Integración Zadarma — `zadarma_sip_id` y `zadarma_redirection_type` en `on_call_groups`; `redirect_status` y trazabilidad de reintentos en `shifts`.
 >
 > **V9**: Vinculación Telegram por `telegram_user_id` (no por chat id) — corrige `/start` en grupos, donde todos los miembros comparten el mismo chat id.
+>
+> **V10**: Auditoría — tabla `audit_logs` con diff campo a campo en JSONB y actor desde el JWT de Google (ver ADR-003).
 
 ---
 
@@ -268,6 +272,33 @@ Base URL: `/api/v1/`
 - Si se extiende el turno → el siguiente turno de la misma persona se acorta
 - Si se acorta el turno → el siguiente turno se extiende para rellenar el hueco
 - Si se mueve el inicio → el turno anterior se ajusta análogamente
+
+### Auditoría
+
+Todas las acciones de escritura (crear, modificar, eliminar) quedan registradas automáticamente en la tabla `audit_logs` con el autor de la acción (desde el JWT de Google), el diff campo a campo en JSONB e IP/método/ruta de la petición. Consulta de solo lectura (ver ADR-003).
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `GET` | `/api/v1/audit-logs` | Listar registros con filtros (`action`, `entityType`, `entityId`, `personId`, `from`, `to`, `q`) y paginación (`page`, `size`) |
+| `GET` | `/api/v1/audit-logs/{id}` | Detalle de un registro (con su diff completo) |
+| `GET` | `/api/v1/audit-logs/entity-types` | Tipos de entidad auditados (para desplegables de filtros) |
+
+**Configuración** (todo modificable en `application.yml` sin tocar código):
+
+```yaml
+app:
+  audit:
+    enabled: true                  # Interruptor global de la auditoría
+    excluded-entities:             # Tablas excluidas de la auditoría
+      - telegram_pending_links     # contiene códigos secretos
+    retention-months: 12           # Retención del histórico (1 año)
+    retention-cron: "0 0 4 * * *"  # Purga diaria a las 04:00
+    log-reads: false               # Las lecturas GET no se auditan
+```
+
+- La auditoría es **append-only**: la única vía de borrado es la purga por retención.
+- Acciones sin contexto HTTP (bot de Telegram, schedulers) se registran con actor `SYSTEM`.
+- El acceso a la consulta está abierto a cualquier usuario autenticado (decisión temporal; se revisará cuando exista modelo de roles).
 
 ### Zadarma — Redirección de llamadas VoIP
 

@@ -8,6 +8,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.nextdigital.oncall.entity.Person;
 import com.nextdigital.oncall.service.PersonService;
 
 import jakarta.servlet.FilterChain;
@@ -21,6 +22,12 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 @RequiredArgsConstructor
 public class PersonSyncFilter extends OncePerRequestFilter {
+
+    /**
+     * Atributo de petición donde se publica la Person sincronizada desde Google,
+     * para que la auditoría resuelva el actor sin consultas extra a BD.
+     */
+    public static final String PERSON_ATTRIBUTE = "oncall.syncedPerson";
 
     private final PersonService personService;
 
@@ -38,7 +45,8 @@ public class PersonSyncFilter extends OncePerRequestFilter {
 
             if (email != null && googleSub != null) {
                 try {
-                    personService.syncFromGoogle(email, name, googleSub);
+                    Person person = personService.syncFromGoogle(email, name, googleSub);
+                    request.setAttribute(PERSON_ATTRIBUTE, person);
                 } catch (Exception e) {
                     log.error("Failed to sync Person from Google SSO for email {}: {}", email, e.getMessage(), e);
                 }
