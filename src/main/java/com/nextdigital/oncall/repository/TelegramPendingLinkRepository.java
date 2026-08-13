@@ -13,5 +13,7 @@ public interface TelegramPendingLinkRepository extends JpaRepository<TelegramPen
 
     Optional<TelegramPendingLink> findByChatId(String chatId);
 
+    Optional<TelegramPendingLink> findByUserId(String userId);
+
     void deleteByLinkCode(String linkCode);
 }

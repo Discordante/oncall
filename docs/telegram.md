@@ -79,6 +79,7 @@ Java 25.
 |---|---|---|
 | V3 | `V3__add_telegram_integration.sql` | Columnas Telegram en `people` y `on_call_groups`, tabla `telegram_pending_links` |
 | V4 | `V4__add_telegram_invite_link.sql` | Columna `telegram_group_invite_link` en `on_call_groups` |
+| V9 | `V9__add_telegram_user_id.sql` | Vinculación por `telegram_user_id` (no chat id) en `people` y `telegram_pending_links` |
 
 ### Columnas añadidas
 
@@ -86,7 +87,8 @@ Java 25.
 
 | Columna | Tipo | Descripción |
 |---|---|---|
-| `telegram_chat_id` | `VARCHAR(255) UNIQUE` | ID del chat de Telegram del usuario (se llena al vincular) |
+| `telegram_user_id` | `VARCHAR(255) UNIQUE` | ID de usuario de Telegram (`message.from.id`), identidad única de la cuenta vinculada |
+| `telegram_chat_id` | `VARCHAR(255) UNIQUE` | ID del chat privado usado para DMs (solo se guarda si `/start` se envió desde chat privado) |
 | `telegram_link_code` | `VARCHAR(36) UNIQUE` | Código único de verificación (UUID sin guiones) |
 | `telegram_linked_at` | `TIMESTAMP WITH TIME ZONE` | Cuándo se vinculó la cuenta |
 
@@ -104,7 +106,9 @@ Java 25.
 | Columna | Tipo | Descripción |
 |---|---|---|
 | `id` | `UUID PK` | ID único |
-| `chat_id` | `VARCHAR(255) NOT NULL` | Chat ID de Telegram del usuario |
+| `user_id` | `VARCHAR(255) NOT NULL` | ID de usuario de Telegram que solicitó el código |
+| `chat_id` | `VARCHAR(255) NOT NULL` | Chat donde se envió `/start` (privado o grupo) |
+| `chat_type` | `VARCHAR(32)` | Tipo de chat: `private`, `group` o `supergroup` |
 | `link_code` | `VARCHAR(36) NOT NULL UNIQUE` | Código de verificación |
 | `created_at` | `TIMESTAMP WITH TIME ZONE NOT NULL` | Fecha de creación |
 | `expires_at` | `TIMESTAMP WITH TIME ZONE NOT NULL` | Fecha de expiración (15 min) |
@@ -178,7 +182,7 @@ de Oncall con su chat de Telegram para recibir notificaciones personalizadas
 y usar los comandos del bot.
 
 ```
-1. Usuario escribe /start en el chat privado con el bot
+1. Usuario escribe /start (en el chat privado con el bot o en el grupo de guardia)
         │
 2. Bot genera un código UUID único y lo guarda en
    telegram_pending_links (expira en 15 min)
@@ -191,7 +195,9 @@ y usar los comandos del bot.
    POST /api/v1/telegram/link { "code": "a1b2c3d4..." }
         │
 5. Sistema busca el código en telegram_pending_links,
-   obtiene el chat_id, lo asigna al Person autenticado
+   obtiene el user_id de Telegram y lo asigna al Person autenticado.
+   El chat_id solo se guarda si el /start se envió desde un chat privado
+   (es el destino de los mensajes directos)
         │
 6. Bot confirma: "✅ Cuenta vinculada correctamente."
         │
@@ -200,6 +206,15 @@ y usar los comandos del bot.
    ├── Resúmenes diarios/semanales
    └── Puede usar /info, /turnos en el grupo
 ```
+
+> **Identidad por user_id, no por chat_id.** En un grupo de Telegram todos
+> los miembros comparten el mismo `chat.id`; la identidad única de cada
+> cuenta es `message.from.id`. La vinculación usa ese `user_id`, por lo que
+> `/start` desde el grupo identifica correctamente a cada persona. El
+> `chat_id` privado solo se almacena como destino de mensajes directos y,
+> si el usuario solo interactuó en el grupo, queda a null (las
+> notificaciones personales no pueden enviarse por DM hasta que el usuario
+> escriba también al bot en privado).
 
 ### API de vinculación
 

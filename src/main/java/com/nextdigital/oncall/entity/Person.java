@@ -52,6 +52,18 @@ public class Person {
     @Builder.Default
     private Boolean isActive = true;
 
+    /**
+     * Telegram user id (message.from.id). Unique identity of the Telegram
+     * account linked to this person. Unlike the chat id, it is the same for
+     * a user in every chat (private or group).
+     */
+    @Column(name = "telegram_user_id", unique = true)
+    private String telegramUserId;
+
+    /**
+     * Private chat id used to deliver direct messages (DM). Only set when
+     * the person linked the account from a private chat with the bot.
+     */
     @Column(name = "telegram_chat_id", unique = true)
     private String telegramChatId;
 

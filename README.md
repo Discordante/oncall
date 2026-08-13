@@ -165,6 +165,8 @@ Hibernate opera con `ddl-auto=validate`: el esquema lo gestiona exclusivamente F
 > **V3**: Integración Telegram — columnas en `people` y `on_call_groups`, tabla `telegram_pending_links`.
 >
 > **V6**: Integración Zadarma — `zadarma_sip_id` y `zadarma_redirection_type` en `on_call_groups`; `redirect_status` y trazabilidad de reintentos en `shifts`.
+>
+> **V9**: Vinculación Telegram por `telegram_user_id` (no por chat id) — corrige `/start` en grupos, donde todos los miembros comparten el mismo chat id.
 
 ---
 

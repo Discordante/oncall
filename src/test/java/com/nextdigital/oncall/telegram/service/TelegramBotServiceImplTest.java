@@ -9,7 +9,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import static org.mockito.Mockito.never;
@@ -86,7 +89,9 @@ class TelegramBotServiceImplTest {
 
         pendingLink = TelegramPendingLink.builder()
                 .id(UUID.randomUUID())
+                .userId("555666777")
                 .chatId("123456789")
+                .chatType("private")
                 .linkCode(validCode)
                 .expiresAt(OffsetDateTime.now().plusHours(1))
                 .build();
@@ -180,12 +185,14 @@ class TelegramBotServiceImplTest {
     void linkForPerson_withValidData_linksAccount() {
         when(pendingLinkRepository.findByLinkCode(validCode)).thenReturn(Optional.of(pendingLink));
         when(personRepository.findById(personId)).thenReturn(Optional.of(person));
+        when(personRepository.findByTelegramUserId(pendingLink.getUserId())).thenReturn(Optional.empty());
         when(personRepository.findByTelegramChatId(pendingLink.getChatId())).thenReturn(Optional.empty());
 
         var result = service.linkForPerson(personId, validCode);
 
         assertThat(result.success()).isTrue();
         assertThat(result.message()).contains("vinculada");
+        assertThat(person.getTelegramUserId()).isEqualTo("555666777");
         assertThat(person.getTelegramChatId()).isEqualTo("123456789");
         assertThat(person.getTelegramLinkedAt()).isNotNull();
         verify(personRepository).save(person);
@@ -231,25 +238,54 @@ class TelegramBotServiceImplTest {
     }
 
     @Test
-    void linkForPerson_whenChatAlreadyLinked_unlinksPrevious() {
+    void linkForPerson_whenUserAlreadyLinked_unlinksPrevious() {
         var previousPerson = Person.builder()
                 .id(UUID.randomUUID())
                 .name("Bob")
                 .email("bob@test.com")
-                .telegramChatId("123456789")
+                .telegramUserId("555666777")
                 .build();
 
         when(pendingLinkRepository.findByLinkCode(validCode)).thenReturn(Optional.of(pendingLink));
         when(personRepository.findById(personId)).thenReturn(Optional.of(person));
-        when(personRepository.findByTelegramChatId(pendingLink.getChatId())).thenReturn(Optional.of(previousPerson));
+        when(personRepository.findByTelegramUserId(pendingLink.getUserId()))
+                .thenReturn(Optional.of(previousPerson));
+        when(personRepository.findByTelegramChatId(pendingLink.getChatId())).thenReturn(Optional.empty());
 
         var result = service.linkForPerson(personId, validCode);
 
         assertThat(result.success()).isTrue();
+        assertThat(previousPerson.getTelegramUserId()).isNull();
         assertThat(previousPerson.getTelegramChatId()).isNull();
+        assertThat(previousPerson.getTelegramLinkedAt()).isNull();
+        assertThat(person.getTelegramUserId()).isEqualTo("555666777");
         assertThat(person.getTelegramChatId()).isEqualTo("123456789");
         verify(personRepository).save(previousPerson);
         verify(personRepository).save(person);
+    }
+
+    @Test
+    void linkForPerson_whenStartWasInGroup_doesNotStoreGroupChatId() {
+        var groupLink = TelegramPendingLink.builder()
+                .id(UUID.randomUUID())
+                .userId("555666777")
+                .chatId("-1001234567890")
+                .chatType("group")
+                .linkCode(validCode)
+                .expiresAt(OffsetDateTime.now().plusHours(1))
+                .build();
+
+        when(pendingLinkRepository.findByLinkCode(validCode)).thenReturn(Optional.of(groupLink));
+        when(personRepository.findById(personId)).thenReturn(Optional.of(person));
+        when(personRepository.findByTelegramUserId(groupLink.getUserId())).thenReturn(Optional.empty());
+
+        var result = service.linkForPerson(personId, validCode);
+
+        assertThat(result.success()).isTrue();
+        assertThat(person.getTelegramUserId()).isEqualTo("555666777");
+        assertThat(person.getTelegramChatId()).isNull();
+        verify(personRepository, never()).findByTelegramChatId(any());
+        verify(pendingLinkRepository).delete(groupLink);
     }
 
     // ========================================================================
@@ -402,5 +438,85 @@ class TelegramBotServiceImplTest {
         service.notifyPerson(personId, "Personal message");
 
         verify(apiClient, never()).sendMessage(any(), any(), any());
+    }
+
+    // ========================================================================
+    // /start handling via pollUpdates
+    // ========================================================================
+
+    @Test
+    void pollUpdates_startAlreadyLinked_resolvesByUserId() {
+        when(botConfig.isPollingEnabled()).thenReturn(true);
+        when(onCallGroupRepository.findById(groupId)).thenReturn(Optional.of(group));
+        service.registerGroupBot(groupId);
+
+        var fromId = "555666777";
+        var groupChatId = "-1001234567890";
+        var update = updateWith("/start", groupChatId, "group", fromId);
+        when(apiClient.getUpdates("test:token", 0L, 2)).thenReturn(List.of(update));
+        when(personRepository.findByTelegramUserId(fromId)).thenReturn(Optional.of(person));
+
+        service.pollUpdates();
+
+        verify(apiClient).sendMessage(eq("test:token"), eq(groupChatId), argThat(m -> m.contains("Alice")));
+        verify(pendingLinkRepository, never()).save(any());
+    }
+
+    @Test
+    void pollUpdates_startNotLinked_createsPendingLinkWithUserIdAndChatType() {
+        when(botConfig.isPollingEnabled()).thenReturn(true);
+        when(onCallGroupRepository.findById(groupId)).thenReturn(Optional.of(group));
+        service.registerGroupBot(groupId);
+
+        var fromId = "555666777";
+        var groupChatId = "-1001234567890";
+        var update = updateWith("/start", groupChatId, "group", fromId);
+        when(apiClient.getUpdates("test:token", 0L, 2)).thenReturn(List.of(update));
+        when(personRepository.findByTelegramUserId(fromId)).thenReturn(Optional.empty());
+        when(pendingLinkRepository.findByUserId(fromId)).thenReturn(Optional.empty());
+
+        service.pollUpdates();
+
+        var captor = ArgumentCaptor.forClass(TelegramPendingLink.class);
+        verify(pendingLinkRepository).save(captor.capture());
+        var saved = captor.getValue();
+        assertThat(saved.getUserId()).isEqualTo(fromId);
+        assertThat(saved.getChatType()).isEqualTo("group");
+        assertThat(saved.getChatId()).isEqualTo(groupChatId);
+        assertThat(saved.getLinkCode()).isNotBlank();
+    }
+
+    @Test
+    void pollUpdates_startAlreadyLinkedInPrivateChat_healsChatId() {
+        when(botConfig.isPollingEnabled()).thenReturn(true);
+        when(onCallGroupRepository.findById(groupId)).thenReturn(Optional.of(group));
+        service.registerGroupBot(groupId);
+
+        var fromId = "555666777";
+        var privateChatId = "999000111";
+        person.setTelegramUserId(fromId);
+        person.setTelegramChatId(null);
+
+        var update = updateWith("/start", privateChatId, "private", fromId);
+        when(apiClient.getUpdates("test:token", 0L, 2)).thenReturn(List.of(update));
+        when(personRepository.findByTelegramUserId(fromId)).thenReturn(Optional.of(person));
+
+        service.pollUpdates();
+
+        assertThat(person.getTelegramChatId()).isEqualTo(privateChatId);
+        verify(personRepository).save(person);
+    }
+
+    private TelegramApiClient.TelegramUpdate updateWith(String text, String chatId, String chatType, String fromId) {
+        return new TelegramApiClient.TelegramUpdate(
+                1L,
+                new TelegramApiClient.TelegramMessage(
+                        1L,
+                        new TelegramApiClient.TelegramChat(Long.parseLong(chatId), chatType, "Chat", null, null),
+                        new TelegramApiClient.TelegramFrom(Long.parseLong(fromId), false, "Sender", null, null, null),
+                        text,
+                        new TelegramApiClient.TelegramEntity[] {
+                                new TelegramApiClient.TelegramEntity(0, 6, "bot_command")
+                        }));
     }
 }
