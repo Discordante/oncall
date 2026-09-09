@@ -1,12 +1,7 @@
 package com.nextdigital.oncall.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
-import java.time.Duration;
+import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -14,11 +9,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import static org.mockito.ArgumentMatchers.any;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -233,6 +234,31 @@ class ShiftGenerationServiceImplTest {
 
                 assertThat(result.shiftsCreated()).isEqualTo(4);
                 assertThat(result.warnings()).isEmpty();
+        }
+
+        @Test
+        void generateForGroup_shiftsStartMondayAtShiftChangeTime() {
+                when(onCallGroupRepository.findById(groupId)).thenReturn(Optional.of(group));
+                when(shiftRepository.findTopByOnCallGroupIdOrderByEndTimeDesc(groupId))
+                                .thenReturn(Optional.empty());
+                when(shiftRepository.findByOnCallGroupIdAndEndTimeGreaterThanOrderByStartTimeAsc(
+                                any(UUID.class), any(OffsetDateTime.class)))
+                                .thenReturn(List.of());
+
+                var now = OffsetDateTime.now(ZONE);
+                var createdShift = buildShiftResponse(alice, now.plusWeeks(3), now.plusWeeks(4));
+                when(shiftService.create(any(ShiftRequest.class))).thenReturn(createdShift);
+
+                generationService.generateForGroup(groupId);
+
+                var captor = ArgumentCaptor.forClass(ShiftRequest.class);
+                verify(shiftService, times(4)).create(captor.capture());
+
+                assertThat(captor.getAllValues()).allSatisfy(req -> {
+                        var start = req.startTime().atZoneSameInstant(ZONE);
+                        assertThat(start.getDayOfWeek()).isEqualTo(DayOfWeek.MONDAY);
+                        assertThat(start.toLocalTime()).isEqualTo(LocalTime.of(8, 0));
+                });
         }
 
         // --- generateForAllGroups ---
