@@ -247,10 +247,8 @@ public class AuditEventListener implements PostInsertEventListener, PostUpdateEv
                     .personId(actor != null ? actor.personId() : null)
                     .actorEmail(actor != null ? actor.email() : null)
                     .actorName(actor != null ? actor.name() : null)
-                    .ipAddress(info != null ? info.ip() : null)
                     .httpMethod(info != null ? info.method() : null)
                     .requestPath(info != null ? info.path() : null)
-                    .userAgent(info != null ? info.userAgent() : null)
                     .build();
 
             // Se inserta por JDBC directo en la conexión de la transacción:
@@ -271,9 +269,9 @@ public class AuditEventListener implements PostInsertEventListener, PostUpdateEv
     private void insertAuditLog(Connection connection, AuditLog row) throws SQLException {
         String sql = """
                 INSERT INTO audit_logs (occurred_at, action, entity_type, entity_id, changes,
-                                        person_id, actor_email, actor_name, ip_address, http_method,
-                                        request_path, user_agent)
-                VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?)
+                                        person_id, actor_email, actor_name, http_method,
+                                        request_path)
+                VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?)
                 """;
         try (var statement = connection.prepareStatement(sql)) {
             statement.setObject(1, row.getOccurredAt());
@@ -284,10 +282,8 @@ public class AuditEventListener implements PostInsertEventListener, PostUpdateEv
             statement.setObject(6, row.getPersonId());
             statement.setString(7, row.getActorEmail());
             statement.setString(8, row.getActorName());
-            statement.setString(9, row.getIpAddress());
-            statement.setString(10, row.getHttpMethod());
-            statement.setString(11, row.getRequestPath());
-            statement.setString(12, row.getUserAgent());
+            statement.setString(9, row.getHttpMethod());
+            statement.setString(10, row.getRequestPath());
             statement.executeUpdate();
         }
     }

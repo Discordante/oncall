@@ -43,10 +43,8 @@ CREATE TABLE audit_logs (
     person_id    UUID REFERENCES people(id), -- actor (NULL = SYSTEM)
     actor_email  VARCHAR(255),            -- snapshot denormalizado
     actor_name   VARCHAR(255),
-    ip_address   VARCHAR(45),
     http_method  VARCHAR(10),
-    request_path VARCHAR(500),
-    user_agent   VARCHAR(500)
+    request_path VARCHAR(500)
 );
 
 CREATE INDEX idx_audit_logs_entity      ON audit_logs (entity_type, entity_id);
@@ -57,13 +55,14 @@ CREATE INDEX idx_audit_logs_changes     ON audit_logs USING GIN (changes);
 
 - Tabla append-only: no lleva `updated_at` (desviación documentada de la convención de columnas obligatorias).
 - El esquema se crea en la migración Flyway `V10__create_audit_tables.sql` (con `ddl-auto=validate`, el esquema solo lo gestiona Flyway).
+- **Actualización (2026-09-09)**: la migración `V11__drop_audit_ip_user_agent.sql` elimina `ip_address` y `user_agent`; esos metadatos HTTP dejan de registrarse para simplificar el log.
 
 ### 3. Actor desde el JWT
 
 - `AuditActorProvider` (paquete `audit/`) lee `SecurityContextHolder`:
   - Si hay `JwtAuthenticationToken` → `email`/`name`/`sub` del token y la `Person` resuelta (el `PersonSyncFilter` publica la `Person` sincronizada en un atributo de la petición para evitar consultas extra; fallback a `PersonRepository.findByEmail`).
   - Si no hay contexto autenticado (bot de Telegram, schedulers) → actor `SYSTEM` con columnas de actor a `NULL`.
-- Metadatos HTTP (`ip_address`, `http_method`, `request_path`, `user_agent`) desde `RequestContextHolder`, nulo-seguro para contextos sin petición.
+- Metadatos HTTP (`http_method`, `request_path`) desde `RequestContextHolder`, nulo-seguro para contextos sin petición.
 
 ### 4. Configuración centralizada (`app.audit.*`)
 

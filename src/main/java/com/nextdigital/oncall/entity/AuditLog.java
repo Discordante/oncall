@@ -66,15 +66,9 @@ public class AuditLog {
     @Column(name = "actor_name")
     private String actorName;
 
-    @Column(name = "ip_address", length = 45)
-    private String ipAddress;
-
     @Column(name = "http_method", length = 10)
     private String httpMethod;
 
     @Column(name = "request_path", length = 500)
     private String requestPath;
-
-    @Column(name = "user_agent", length = 500)
-    private String userAgent;
 }
