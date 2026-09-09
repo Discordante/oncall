@@ -43,6 +43,15 @@ google:
 app:
   frontend-url: ${APP_FRONTEND_URL:http://localhost:5173}
 
+  # Auditoría de acciones (tabla audit_logs) — ver docs/adr/003
+  audit:
+    enabled: true                  # Interruptor global del motor de auditoría
+    excluded-entities:             # Tablas excluidas de la auditoría
+      - telegram_pending_links     # contiene códigos secretos
+    retention-months: 12           # Retención del histórico (1 año)
+    retention-cron: "0 0 4 * * *"  # Purga diaria a las 04:00
+    log-reads: false               # Las lecturas GET no se auditan
+
 # Telegram bot integration
 telegram:
   bot:

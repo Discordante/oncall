@@ -6,7 +6,6 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -34,6 +33,11 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 public class ShiftGenerationServiceImpl implements ShiftGenerationService {
+
+    /**
+     * Hora local (en la zona configurada) a la que cambian las guardias generadas
+     */
+    private static final LocalTime SHIFT_CHANGE_TIME = LocalTime.of(8, 0);
 
     private final ShiftService shiftService;
     private final ShiftRepository shiftRepository;
@@ -172,11 +176,11 @@ public class ShiftGenerationServiceImpl implements ShiftGenerationService {
     private OffsetDateTime alignToNextMonday(OffsetDateTime from, ZoneId zoneId) {
         var zdt = from.atZoneSameInstant(zoneId);
         if (zdt.getDayOfWeek() == DayOfWeek.MONDAY
-                && zdt.toLocalTime().equals(LocalTime.MIDNIGHT)) {
+                && zdt.toLocalTime().equals(SHIFT_CHANGE_TIME)) {
             return from;
         }
         var nextMonday = zdt.with(DayOfWeek.MONDAY)
-                .truncatedTo(ChronoUnit.DAYS)
+                .with(SHIFT_CHANGE_TIME)
                 .plusWeeks(1);
         return nextMonday.toOffsetDateTime();
     }
