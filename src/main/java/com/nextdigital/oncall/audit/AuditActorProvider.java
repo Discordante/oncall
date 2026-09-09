@@ -33,7 +33,7 @@ public class AuditActorProvider {
     public record Actor(UUID personId, String email, String name) {
     }
 
-    public record RequestInfo(String ip, String method, String path, String userAgent) {
+    public record RequestInfo(String method, String path) {
     }
 
     public Actor current() {
@@ -71,10 +71,8 @@ public class AuditActorProvider {
                     path = path + "?" + request.getQueryString();
                 }
                 return new RequestInfo(
-                        clientIp(request),
                         request.getMethod(),
-                        truncate(path, 500),
-                        truncate(request.getHeader("User-Agent"), 500));
+                        truncate(path, 500));
             }
         } catch (Exception e) {
             log.debug("Sin petición servlet disponible para metadatos de auditoría: {}", e.getMessage());
@@ -90,14 +88,6 @@ public class AuditActorProvider {
             }
         }
         return null;
-    }
-
-    private String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return truncate(forwarded.split(",")[0].trim(), 45);
-        }
-        return truncate(request.getRemoteAddr(), 45);
     }
 
     private String truncate(String value, int maxLength) {

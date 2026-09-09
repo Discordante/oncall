@@ -22,9 +22,7 @@ public final class AuditLogMapper {
                 log.getPersonId(),
                 log.getActorEmail(),
                 log.getActorName(),
-                log.getIpAddress(),
                 log.getHttpMethod(),
-                log.getRequestPath(),
-                log.getUserAgent());
+                log.getRequestPath());
     }
 }
