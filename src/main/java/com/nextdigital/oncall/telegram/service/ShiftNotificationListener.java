@@ -84,7 +84,7 @@ public class ShiftNotificationListener {
     }
 
     private static final ZoneId MADRID = ZoneId.of("Europe/Madrid");
-    private static final DateTimeFormatter DATETIME_TZ = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm (xxx)");
+    private static final DateTimeFormatter DATETIME_TZ = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private String formatDateTime(OffsetDateTime dt) {
         return dt.atZoneSameInstant(MADRID).format(DATETIME_TZ);
