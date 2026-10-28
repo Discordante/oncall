@@ -25,9 +25,11 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
                         @Param("startTime") OffsetDateTime startTime,
                         @Param("endTime") OffsetDateTime endTime);
 
-        @Query("SELECT s FROM Shift s WHERE s.person.id <> :personId " +
+        @Query("SELECT s FROM Shift s WHERE s.onCallGroup.id = :groupId " +
+                        "AND s.person.id <> :personId " +
                         "AND s.startTime < :endTime AND s.endTime > :startTime")
         List<Shift> findOverlappingByOtherPersons(
+                        @Param("groupId") UUID groupId,
                         @Param("personId") UUID personId,
                         @Param("startTime") OffsetDateTime startTime,
                         @Param("endTime") OffsetDateTime endTime);
@@ -40,9 +42,11 @@ public interface ShiftRepository extends JpaRepository<Shift, UUID> {
                         @Param("startTime") OffsetDateTime startTime,
                         @Param("endTime") OffsetDateTime endTime);
 
-        @Query("SELECT s FROM Shift s WHERE s.person.id <> :personId " +
+        @Query("SELECT s FROM Shift s WHERE s.onCallGroup.id = :groupId " +
+                        "AND s.person.id <> :personId " +
                         "AND s.id <> :shiftId AND s.startTime < :endTime AND s.endTime > :startTime")
         List<Shift> findOverlappingByOtherPersonsExcludingSelf(
+                        @Param("groupId") UUID groupId,
                         @Param("personId") UUID personId,
                         @Param("shiftId") UUID shiftId,
                         @Param("startTime") OffsetDateTime startTime,

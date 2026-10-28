@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.nextdigital.oncall</groupId>
 	<artifactId>oncall</artifactId>
-	<version>0.0.2</version>
+	<version>0.0.3</version>
 	<name>oncall</name>
 	<description/>
 	<url/>
