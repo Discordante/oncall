@@ -349,4 +349,66 @@ class ShiftIntegrationTest {
                 assertThat(response.errors()).isNotEmpty();
                 assertThat(response.errors().get(0).code()).isEqualTo("NOT_FOUND");
         }
+
+        @Test
+        void create_doesNotSplitShiftsFromDifferentGroup() throws Exception {
+                // Create a second group
+                var group2Result = mockMvc.perform(post("/api/v1/on-call-groups")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(new OnCallGroupRequest("Other Group", null,
+                                                null, null, null, null, null, null, null, null)))
+                                .with(jwt()))
+                                .andExpect(status().isCreated())
+                                .andReturn();
+                var group2Id = objectMapper.readValue(
+                                group2Result.getResponse().getContentAsString(),
+                                new TypeReference<ApiResponse<OnCallGroupResponse>>() {
+                                }).data().id();
+
+                // Create Bob (person for group 2)
+                var bobResult = mockMvc.perform(post("/api/v1/people")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(
+                                                new PersonRequest("Bob", "bob@example.com", null, true)))
+                                .with(jwt()))
+                                .andExpect(status().isCreated())
+                                .andReturn();
+                var bobId = objectMapper.readValue(
+                                bobResult.getResponse().getContentAsString(),
+                                new TypeReference<ApiResponse<PersonResponse>>() {
+                                }).data().id();
+
+                // Alice has DAY10_00→DAY17_08 in group 1
+                var aliceShiftResult = mockMvc.perform(post("/api/v1/shifts")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(
+                                                new ShiftRequest(groupId, personId, DAY10_00, DAY17_08)))
+                                .with(jwt()))
+                                .andExpect(status().isCreated())
+                                .andReturn();
+                var aliceShiftId = objectMapper.readValue(
+                                aliceShiftResult.getResponse().getContentAsString(),
+                                new TypeReference<ApiResponse<ShiftResponse>>() {
+                                }).data().id();
+
+                // Bob takes the same range in group 2 — must NOT touch Alice's shift in group 1
+                mockMvc.perform(post("/api/v1/shifts")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(
+                                                new ShiftRequest(group2Id, bobId, DAY10_00, DAY17_08)))
+                                .with(jwt()))
+                                .andExpect(status().isCreated());
+
+                // Alice's shift must be completely intact
+                var aliceShiftGet = mockMvc.perform(get("/api/v1/shifts/{id}", aliceShiftId).with(jwt()))
+                                .andExpect(status().isOk())
+                                .andReturn();
+                var aliceShift = objectMapper.readValue(
+                                aliceShiftGet.getResponse().getContentAsString(),
+                                new TypeReference<ApiResponse<ShiftResponse>>() {
+                                }).data();
+
+                assertThat(aliceShift.startTime()).isEqualTo(DAY10_00);
+                assertThat(aliceShift.endTime()).isEqualTo(DAY17_08);
+        }
 }

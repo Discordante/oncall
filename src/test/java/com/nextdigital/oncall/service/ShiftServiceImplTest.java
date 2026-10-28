@@ -165,7 +165,7 @@ class ShiftServiceImplTest {
                 when(personRepository.findById(personA.getId())).thenReturn(Optional.of(personA));
                 when(repository.findOverlappingByPerson(personA.getId(), DAY10_00, DAY17_08))
                                 .thenReturn(List.of());
-                when(repository.findOverlappingByOtherPersons(personA.getId(), DAY10_00, DAY17_08))
+                when(repository.findOverlappingByOtherPersons(group.getId(), personA.getId(), DAY10_00, DAY17_08))
                                 .thenReturn(List.of());
                 when(repository.save(any())).thenAnswer(inv -> {
                         var saved = inv.getArgument(0, Shift.class);
@@ -218,7 +218,7 @@ class ShiftServiceImplTest {
                 when(personRepository.findById(personB.getId())).thenReturn(Optional.of(personB));
                 when(repository.findOverlappingByPerson(personB.getId(), DAY15_12, DAY15_21))
                                 .thenReturn(List.of());
-                when(repository.findOverlappingByOtherPersons(personB.getId(), DAY15_12, DAY15_21))
+                when(repository.findOverlappingByOtherPersons(group.getId(), personB.getId(), DAY15_12, DAY15_21))
                                 .thenReturn(List.of(existingShift));
                 when(repository.save(any())).thenAnswer(inv -> {
                         var saved = inv.getArgument(0, Shift.class);
@@ -258,7 +258,7 @@ class ShiftServiceImplTest {
                 when(personRepository.findById(personB.getId())).thenReturn(Optional.of(personB));
                 when(repository.findOverlappingByPerson(personB.getId(), DAY10_00, DAY12_00))
                                 .thenReturn(List.of());
-                when(repository.findOverlappingByOtherPersons(personB.getId(), DAY10_00, DAY12_00))
+                when(repository.findOverlappingByOtherPersons(group.getId(), personB.getId(), DAY10_00, DAY12_00))
                                 .thenReturn(List.of(aShift));
                 when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -288,7 +288,7 @@ class ShiftServiceImplTest {
                 when(personRepository.findById(personB.getId())).thenReturn(Optional.of(personB));
                 when(repository.findOverlappingByPerson(personB.getId(), DAY15_12, DAY17_08))
                                 .thenReturn(List.of());
-                when(repository.findOverlappingByOtherPersons(personB.getId(), DAY15_12, DAY17_08))
+                when(repository.findOverlappingByOtherPersons(group.getId(), personB.getId(), DAY15_12, DAY17_08))
                                 .thenReturn(List.of(aShift));
                 when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -321,7 +321,7 @@ class ShiftServiceImplTest {
                 when(personRepository.findById(personB.getId())).thenReturn(Optional.of(personB));
                 when(repository.findOverlappingByPerson(personB.getId(), bStart, bEnd))
                                 .thenReturn(List.of());
-                when(repository.findOverlappingByOtherPersons(personB.getId(), bStart, bEnd))
+                when(repository.findOverlappingByOtherPersons(group.getId(), personB.getId(), bStart, bEnd))
                                 .thenReturn(List.of(aShift));
                 when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -353,7 +353,7 @@ class ShiftServiceImplTest {
                 when(onCallGroupRepository.findById(group.getId())).thenReturn(Optional.of(group));
                 when(personRepository.findById(personA.getId())).thenReturn(Optional.of(personA));
                 when(repository.findOverlappingByOtherPersonsExcludingSelf(
-                                personA.getId(), shiftId, DAY10_00, newEnd))
+                                group.getId(), personA.getId(), shiftId, DAY10_00, newEnd))
                                 .thenReturn(List.of());
                 when(repository.findByPersonIdOrderByStartTimeAsc(personA.getId()))
                                 .thenReturn(List.of(existingShift, nextShift));
@@ -385,7 +385,7 @@ class ShiftServiceImplTest {
                 when(onCallGroupRepository.findById(group.getId())).thenReturn(Optional.of(group));
                 when(personRepository.findById(personA.getId())).thenReturn(Optional.of(personA));
                 when(repository.findOverlappingByOtherPersonsExcludingSelf(
-                                personA.getId(), shiftId, DAY10_00, DAY14_00))
+                                group.getId(), personA.getId(), shiftId, DAY10_00, DAY14_00))
                                 .thenReturn(List.of());
                 when(repository.findByPersonIdOrderByStartTimeAsc(personA.getId()))
                                 .thenReturn(List.of(existingShift, nextShift));
@@ -419,7 +419,7 @@ class ShiftServiceImplTest {
                 when(onCallGroupRepository.findById(group.getId())).thenReturn(Optional.of(group));
                 when(personRepository.findById(personA.getId())).thenReturn(Optional.of(personA));
                 when(repository.findOverlappingByOtherPersonsExcludingSelf(
-                                personA.getId(), shiftId, newStart, DAY17_08))
+                                group.getId(), personA.getId(), shiftId, newStart, DAY17_08))
                                 .thenReturn(List.of());
                 when(repository.findByPersonIdOrderByStartTimeAsc(personA.getId()))
                                 .thenReturn(List.of(prevShift, existingShift));
@@ -456,7 +456,7 @@ class ShiftServiceImplTest {
                 when(onCallGroupRepository.findById(group.getId())).thenReturn(Optional.of(group));
                 when(personRepository.findById(personA.getId())).thenReturn(Optional.of(personA));
                 when(repository.findOverlappingByOtherPersonsExcludingSelf(
-                                personA.getId(), shiftId, DAY10_00, newEnd))
+                                group.getId(), personA.getId(), shiftId, DAY10_00, newEnd))
                                 .thenReturn(List.of());
                 when(repository.findByPersonIdOrderByStartTimeAsc(personA.getId()))
                                 .thenReturn(List.of(existingShift, nextShift));
@@ -487,7 +487,7 @@ class ShiftServiceImplTest {
                 when(onCallGroupRepository.findById(group.getId())).thenReturn(Optional.of(group));
                 when(personRepository.findById(personA.getId())).thenReturn(Optional.of(personA));
                 when(repository.findOverlappingByOtherPersonsExcludingSelf(
-                                personA.getId(), shiftId, newStart, DAY17_08))
+                                group.getId(), personA.getId(), shiftId, newStart, DAY17_08))
                                 .thenReturn(List.of());
                 when(repository.findByPersonIdOrderByStartTimeAsc(personA.getId()))
                                 .thenReturn(List.of(prevShift, existingShift));

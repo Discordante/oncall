@@ -98,7 +98,7 @@ public class ShiftServiceImpl implements ShiftService {
         }
 
         // 2. Split other persons' shifts that overlap with this range
-        splitOtherPersonShifts(request.personId(), request.startTime(), request.endTime());
+        splitOtherPersonShifts(request.onCallGroupId(), request.personId(), request.startTime(), request.endTime());
 
         // 3. Create the new shift
         var entity = ShiftMapper.toEntity(request, group, person);
@@ -132,7 +132,7 @@ public class ShiftServiceImpl implements ShiftService {
 
         // 1. Split other persons' shifts that overlap with the new range
         splitOtherPersonShiftsExcludingSelf(
-                request.personId(), id, request.startTime(), request.endTime());
+                request.onCallGroupId(), request.personId(), id, request.startTime(), request.endTime());
 
         // 2. Adjust adjacent shifts for the same person
         adjustAdjacentShifts(id, request.personId(),
@@ -206,10 +206,10 @@ public class ShiftServiceImpl implements ShiftService {
      * Split shifts belonging to OTHER persons that overlap with [newStart, newEnd].
      * Used during create().
      */
-    private void splitOtherPersonShifts(UUID newPersonId,
+    private void splitOtherPersonShifts(UUID groupId, UUID newPersonId,
             OffsetDateTime newStart,
             OffsetDateTime newEnd) {
-        var overlapping = repository.findOverlappingByOtherPersons(newPersonId, newStart, newEnd);
+        var overlapping = repository.findOverlappingByOtherPersons(groupId, newPersonId, newStart, newEnd);
         for (var existing : overlapping) {
             splitShift(existing, newStart, newEnd);
         }
@@ -219,11 +219,11 @@ public class ShiftServiceImpl implements ShiftService {
      * Split shifts belonging to OTHER persons that overlap with [newStart, newEnd],
      * excluding a specific shift ID. Used during update().
      */
-    private void splitOtherPersonShiftsExcludingSelf(UUID newPersonId, UUID shiftId,
+    private void splitOtherPersonShiftsExcludingSelf(UUID groupId, UUID newPersonId, UUID shiftId,
             OffsetDateTime newStart,
             OffsetDateTime newEnd) {
         var overlapping = repository.findOverlappingByOtherPersonsExcludingSelf(
-                newPersonId, shiftId, newStart, newEnd);
+                groupId, newPersonId, shiftId, newStart, newEnd);
         for (var existing : overlapping) {
             splitShift(existing, newStart, newEnd);
         }

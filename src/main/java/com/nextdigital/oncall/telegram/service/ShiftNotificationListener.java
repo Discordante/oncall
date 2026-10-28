@@ -5,8 +5,9 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.event.TransactionPhase;
 
 import com.nextdigital.oncall.telegram.event.ShiftCreatedEvent;
 import com.nextdigital.oncall.telegram.event.ShiftDeletedEvent;
@@ -26,7 +27,7 @@ public class ShiftNotificationListener {
 
     private final TelegramBotServiceImpl botService;
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onShiftCreated(ShiftCreatedEvent event) {
         log.debug("Shift created event: {}", event.shiftId());
 
@@ -45,7 +46,7 @@ public class ShiftNotificationListener {
         botService.notifyGroup(event.groupId(), msg);
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onShiftUpdated(ShiftUpdatedEvent event) {
         log.debug("Shift updated event: {}", event.shiftId());
 
@@ -65,7 +66,7 @@ public class ShiftNotificationListener {
         botService.notifyGroup(event.groupId(), msg);
     }
 
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onShiftDeleted(ShiftDeletedEvent event) {
         log.debug("Shift deleted event: {}", event.shiftId());
 
