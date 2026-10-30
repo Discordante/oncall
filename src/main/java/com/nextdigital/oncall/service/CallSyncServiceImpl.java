@@ -6,10 +6,8 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -157,11 +155,12 @@ public class CallSyncServiceImpl implements CallSyncService {
             var application = group.getApplications().iterator().next();
             var title = "Llamada atendida vía SIP %s – %s".formatted(
                     call.getSipId(), call.getCallStartedAt().format(TITLE_FMT));
+            // calls NOT linked here — avoids FK ordering issue within the same transaction;
+            // the user links them manually from the Incidents tab
             var incident = Incident.builder()
                     .title(title)
                     .application(application)
                     .startedAt(call.getCallStartedAt())
-                    .calls(new HashSet<>(Set.of(call)))
                     .build();
             incidentRepository.save(incident);
             log.info("Draft incident created for answered call {} (app: {})",
