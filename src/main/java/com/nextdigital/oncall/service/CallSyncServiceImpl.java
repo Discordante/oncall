@@ -6,14 +6,21 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.nextdigital.oncall.dto.CallRecordResponse;
+import com.nextdigital.oncall.entity.Incident;
+import com.nextdigital.oncall.entity.OnCallGroup;
+import com.nextdigital.oncall.entity.ZadarmaCall;
 import com.nextdigital.oncall.entity.ZadarmaSyncedDay;
 import com.nextdigital.oncall.mapper.ZadarmaCallMapper;
+import com.nextdigital.oncall.repository.IncidentRepository;
 import com.nextdigital.oncall.repository.OnCallGroupRepository;
 import com.nextdigital.oncall.repository.ZadarmaCallRepository;
 import com.nextdigital.oncall.repository.ZadarmaSyncedDayRepository;
@@ -29,10 +36,13 @@ public class CallSyncServiceImpl implements CallSyncService {
 
     private static final DateTimeFormatter ZADARMA_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    private static final DateTimeFormatter TITLE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale.ROOT);
+
     private final ZadarmaReadonlyClient zadarmaReadonlyClient;
     private final ZadarmaCallRepository callRepository;
     private final ZadarmaSyncedDayRepository syncedDayRepository;
     private final OnCallGroupRepository groupRepository;
+    private final IncidentRepository incidentRepository;
 
     @Override
     @Transactional
@@ -94,8 +104,9 @@ public class CallSyncServiceImpl implements CallSyncService {
         int newRecords = 0;
         for (var record : response.stats()) {
             if (!callRepository.existsByExternalCallId(record.id())) {
-                callRepository.save(ZadarmaCallMapper.toEntity(record, group));
+                var saved = callRepository.save(ZadarmaCallMapper.toEntity(record, group));
                 newRecords++;
+                tryCreateDraftIncident(saved, group);
             }
         }
         log.info("Zadarma sync: {} new records persisted (range=[{}, {}] sip={})", newRecords, start, end, sip);
@@ -126,6 +137,38 @@ public class CallSyncServiceImpl implements CallSyncService {
                 }
             }
             cursor = cursor.plusDays(1);
+        }
+    }
+
+    // ─────────────────────────────────────────────
+    // Auto draft incident for answered calls
+    // ─────────────────────────────────────────────
+
+    private void tryCreateDraftIncident(ZadarmaCall call, OnCallGroup group) {
+        if (!"answered".equals(call.getDisposition())) {
+            return;
+        }
+        if (group == null || group.getApplications().isEmpty()) {
+            log.debug("Answered call {} has no associated application — skipping draft incident",
+                    call.getExternalCallId());
+            return;
+        }
+        try {
+            var application = group.getApplications().iterator().next();
+            var title = "Llamada atendida vía SIP %s – %s".formatted(
+                    call.getSipId(), call.getCallStartedAt().format(TITLE_FMT));
+            var incident = Incident.builder()
+                    .title(title)
+                    .application(application)
+                    .startedAt(call.getCallStartedAt())
+                    .calls(new HashSet<>(Set.of(call)))
+                    .build();
+            incidentRepository.save(incident);
+            log.info("Draft incident created for answered call {} (app: {})",
+                    call.getExternalCallId(), application.getName());
+        } catch (Exception e) {
+            log.warn("Could not auto-create draft incident for call {}: {}",
+                    call.getExternalCallId(), e.getMessage());
         }
     }
 

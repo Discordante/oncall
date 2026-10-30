@@ -9,8 +9,10 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +22,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.nextdigital.oncall.entity.Application;
+import com.nextdigital.oncall.entity.OnCallGroup;
+import com.nextdigital.oncall.entity.ZadarmaCall;
+
+import com.nextdigital.oncall.repository.IncidentRepository;
 import com.nextdigital.oncall.repository.OnCallGroupRepository;
 import com.nextdigital.oncall.repository.ZadarmaCallRepository;
 import com.nextdigital.oncall.repository.ZadarmaSyncedDayRepository;
@@ -39,6 +46,8 @@ class CallSyncServiceImplTest {
     ZadarmaSyncedDayRepository syncedDayRepository;
     @Mock
     OnCallGroupRepository groupRepository;
+    @Mock
+    IncidentRepository incidentRepository;
 
     @InjectMocks
     CallSyncServiceImpl service;
@@ -153,5 +162,80 @@ class CallSyncServiceImplTest {
 
     private ZadarmaStatsResponse emptyStats() {
         return new ZadarmaStatsResponse("success", START, END, List.of());
+    }
+
+    @Test
+    void answeredCall_withGroupAndApplication_createsDraftIncident() {
+        when(syncedDayRepository.countCoveredDays(eq(SIP), any(), any())).thenReturn(0L);
+        when(zadarmaReadonlyClient.getStatistics(START, END, SIP)).thenReturn(statsWithOneRecord());
+        when(callRepository.existsByExternalCallId("ext-1")).thenReturn(false);
+
+        var app = Application.builder().id(java.util.UUID.randomUUID()).name("App A").build();
+        var group = OnCallGroup.builder()
+                .id(java.util.UUID.randomUUID())
+                .name("Guardia test")
+                .applications(new HashSet<>(java.util.Set.of(app)))
+                .build();
+        when(groupRepository.findByZadarmaConfigSipId(SIP)).thenReturn(Optional.of(group));
+
+        var savedCall = ZadarmaCall.builder()
+                .id(java.util.UUID.randomUUID())
+                .externalCallId("ext-1").sipId(SIP)
+                .callStartedAt(OffsetDateTime.parse("2026-09-05T10:00:00Z"))
+                .billSeconds(60).disposition("answered")
+                .build();
+        when(callRepository.save(any())).thenReturn(savedCall);
+        when(incidentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(callRepository.findByCallStartedAtBetweenAndSipId(any(), any(), eq(SIP))).thenReturn(List.of());
+
+        service.getCallRecords(START, END, SIP);
+
+        verify(incidentRepository).save(any());
+    }
+
+    @Test
+    void answeredCall_withNoGroup_doesNotCreateDraftIncident() {
+        when(syncedDayRepository.countCoveredDays(eq(SIP), any(), any())).thenReturn(0L);
+        when(zadarmaReadonlyClient.getStatistics(START, END, SIP)).thenReturn(statsWithOneRecord());
+        when(callRepository.existsByExternalCallId("ext-1")).thenReturn(false);
+        when(groupRepository.findByZadarmaConfigSipId(SIP)).thenReturn(Optional.empty());
+
+        var savedCall = ZadarmaCall.builder()
+                .id(java.util.UUID.randomUUID())
+                .externalCallId("ext-1").sipId(SIP)
+                .callStartedAt(OffsetDateTime.parse("2026-09-05T10:00:00Z"))
+                .billSeconds(60).disposition("answered")
+                .build();
+        when(callRepository.save(any())).thenReturn(savedCall);
+        when(callRepository.findByCallStartedAtBetweenAndSipId(any(), any(), eq(SIP))).thenReturn(List.of());
+
+        service.getCallRecords(START, END, SIP);
+
+        verify(incidentRepository, never()).save(any());
+    }
+
+    @Test
+    void nonAnsweredCall_doesNotCreateDraftIncident() {
+        when(syncedDayRepository.countCoveredDays(eq(SIP), any(), any())).thenReturn(0L);
+        var busyRecord = new ZadarmaCallRecord(
+                "ext-busy", SIP, "2026-09-05 10:00:00", 34600000001L, 34921495L,
+                0, ZadarmaCallDisposition.NO_ANSWER, "Spain");
+        when(zadarmaReadonlyClient.getStatistics(START, END, SIP))
+                .thenReturn(new ZadarmaStatsResponse("success", START, END, List.of(busyRecord)));
+        when(callRepository.existsByExternalCallId("ext-busy")).thenReturn(false);
+        when(groupRepository.findByZadarmaConfigSipId(SIP)).thenReturn(Optional.empty());
+
+        var savedCall = ZadarmaCall.builder()
+                .id(java.util.UUID.randomUUID())
+                .externalCallId("ext-busy").sipId(SIP)
+                .callStartedAt(OffsetDateTime.parse("2026-09-05T10:00:00Z"))
+                .billSeconds(0).disposition("no answer")
+                .build();
+        when(callRepository.save(any())).thenReturn(savedCall);
+        when(callRepository.findByCallStartedAtBetweenAndSipId(any(), any(), eq(SIP))).thenReturn(List.of());
+
+        service.getCallRecords(START, END, SIP);
+
+        verify(incidentRepository, never()).save(any());
     }
 }
