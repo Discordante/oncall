@@ -48,6 +48,9 @@ app:
     enabled: true                  # Interruptor global del motor de auditoría
     excluded-entities:             # Tablas excluidas de la auditoría
       - telegram_pending_links     # contiene códigos secretos
+      - zadarma_call_records       # caché técnica — ID compuesto supera VARCHAR(64)
+      - zadarma_synced_days        # caché técnica — clave compuesta no auditable
+      - incidents                  # vinculadas a las llamadas anteriores
     retention-months: 12           # Retención del histórico (1 año)
     retention-cron: "0 0 4 * * *"  # Purga diaria a las 04:00
     log-reads: false               # Las lecturas GET no se auditan
