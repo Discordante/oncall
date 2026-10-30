@@ -153,7 +153,10 @@ public class IncidentServiceImpl implements IncidentService {
     }
 
     private List<ZadarmaCall> resolveCalls(List<UUID> callIds) {
-        if (callIds == null || callIds.isEmpty()) {
+        if (callIds == null) {
+            return null; // null = preserve existing calls; empty list = clear all
+        }
+        if (callIds.isEmpty()) {
             return List.of();
         }
         return callRepository.findAllById(callIds);

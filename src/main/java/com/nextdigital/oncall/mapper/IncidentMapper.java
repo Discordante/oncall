@@ -51,8 +51,8 @@ public final class IncidentMapper {
         entity.setApplication(application);
         entity.setBridgeOpened(request.bridgeOpened());
         entity.setEndedAt(request.endedAt());
-        entity.getCalls().clear();
-        if (calls != null) {
+        if (calls != null) { // null = callRecordIds was absent → preserve existing
+            entity.getCalls().clear();
             entity.getCalls().addAll(calls);
         }
         // startedAt managed by service after this call

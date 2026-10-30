@@ -191,6 +191,25 @@ class IncidentServiceImplTest {
     }
 
     @Test
+    void update_withNullCallRecordIds_preservesExistingCalls() {
+        incident.getCalls().add(call1);
+        incident.setStartedAt(call1.getCallStartedAt());
+
+        var request = new IncidentRequest("Updated title", application.getId(), null, false, null, null, null);
+
+        when(incidentRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
+        when(applicationRepository.findById(application.getId())).thenReturn(Optional.of(application));
+        when(incidentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        var result = service.update(incident.getId(), request);
+
+        // Linked call must still be present
+        assertThat(result.linkedCallsCount()).isEqualTo(1);
+        // startedAt must not be nulled out
+        assertThat(result.startedAt()).isEqualTo(call1.getCallStartedAt());
+    }
+
+    @Test
     void findAll_paginates_withApplicationFilter() {
         var pageable = PageRequest.of(0, 10);
         when(incidentRepository.findByApplicationId(application.getId(), pageable))
