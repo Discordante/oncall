@@ -28,4 +28,11 @@ public class TelegramBotConfig {
      * Public base URL for webhook registration (production).
      */
     private String webhookBaseUrl = "";
+
+    /**
+     * Master switch for outgoing notifications (shift changes, daily/weekly
+     * summaries). When false, the bot still answers commands but sends no
+     * notifications. Useful to silence the bot while bulk-editing shifts.
+     */
+    private boolean notificationsEnabled = true;
 }
