@@ -61,6 +61,9 @@ telegram:
     polling-enabled: true
     polling-interval-ms: 5000
     webhook-base-url: ${TELEGRAM_WEBHOOK_URL:}
+    # Interruptor temporal de notificaciones salientes (guardias, resúmenes).
+    # El bot sigue respondiendo a comandos, pero no envía avisos.
+    notifications-enabled: ${TELEGRAM_NOTIFICATIONS_ENABLED:true}
 
 # Zadarma VoIP API integration
 zadarma:

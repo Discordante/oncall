@@ -299,6 +299,10 @@ public class TelegramBotServiceImpl implements TelegramBotService {
      * Sends a notification message to a group's Telegram chat.
      */
     public void notifyGroup(UUID groupId, String message) {
+        if (!botConfig.isNotificationsEnabled()) {
+            log.debug("Telegram notifications disabled — skipping group {} notification", groupId);
+            return;
+        }
         var bot = activeBots.get(groupId);
         if (bot == null || bot.chatId() == null) {
             log.debug("Group {} has no active bot or chatId", groupId);
@@ -311,6 +315,10 @@ public class TelegramBotServiceImpl implements TelegramBotService {
      * Sends a notification to a specific person via their linked Telegram chat.
      */
     public void notifyPerson(UUID personId, String message) {
+        if (!botConfig.isNotificationsEnabled()) {
+            log.debug("Telegram notifications disabled — skipping person {} notification", personId);
+            return;
+        }
         var person = personRepository.findById(personId).orElse(null);
         if (person == null || person.getTelegramChatId() == null) {
             log.debug("Person {} has no linked Telegram chat", personId);
