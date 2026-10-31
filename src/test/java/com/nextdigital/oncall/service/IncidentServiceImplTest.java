@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.OffsetDateTime;
@@ -72,6 +73,19 @@ class IncidentServiceImplTest {
                 .application(application)
                 .calls(new java.util.HashSet<>())
                 .build();
+    }
+
+    @Test
+    void create_withNoApplication_isAllowed() {
+        var request = new IncidentRequest("Test incident", null, null, false, null, null, null);
+
+        when(incidentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        var result = service.create(request);
+
+        assertThat(result.applicationId()).isNull();
+        assertThat(result.applicationName()).isNull();
+        verifyNoInteractions(applicationRepository);
     }
 
     @Test

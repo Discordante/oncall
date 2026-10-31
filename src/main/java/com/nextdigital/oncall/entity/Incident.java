@@ -49,7 +49,7 @@ public class Incident {
     private String description;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "application_id", nullable = false)
+    @JoinColumn(name = "application_id")
     private Application application;
 
     @Column(name = "bridge_opened", nullable = false)

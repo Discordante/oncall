@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.nextdigital.oncall.dto.IncidentRequest;
 import com.nextdigital.oncall.dto.IncidentResponse;
+import com.nextdigital.oncall.entity.Application;
 import com.nextdigital.oncall.entity.Incident;
 import com.nextdigital.oncall.entity.ZadarmaCall;
 import com.nextdigital.oncall.exception.ResourceNotFoundException;
@@ -51,8 +52,7 @@ public class IncidentServiceImpl implements IncidentService {
     @Override
     @Transactional
     public IncidentResponse create(IncidentRequest request) {
-        var application = applicationRepository.findById(request.applicationId())
-                .orElseThrow(() -> new ResourceNotFoundException("Application", request.applicationId()));
+        var application = resolveApplication(request.applicationId());
         var calls = resolveCalls(request.callRecordIds());
         var incident = IncidentMapper.toEntity(request, application, calls);
         applyStartedAt(incident, request.startedAt());
@@ -65,8 +65,7 @@ public class IncidentServiceImpl implements IncidentService {
     @Transactional
     public IncidentResponse update(UUID id, IncidentRequest request) {
         var incident = findEntity(id);
-        var application = applicationRepository.findById(request.applicationId())
-                .orElseThrow(() -> new ResourceNotFoundException("Application", request.applicationId()));
+        var application = resolveApplication(request.applicationId());
         var calls = resolveCalls(request.callRecordIds());
         IncidentMapper.updateEntity(request, incident, application, calls);
         applyStartedAt(incident, request.startedAt());
@@ -150,6 +149,15 @@ public class IncidentServiceImpl implements IncidentService {
     private Incident findEntity(UUID id) {
         return incidentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Incident", id));
+    }
+
+    /** Application is optional: incidents can be created without one. */
+    private Application resolveApplication(UUID applicationId) {
+        if (applicationId == null) {
+            return null;
+        }
+        return applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Application", applicationId));
     }
 
     private List<ZadarmaCall> resolveCalls(List<UUID> callIds) {

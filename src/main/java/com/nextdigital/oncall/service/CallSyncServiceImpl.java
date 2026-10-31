@@ -3,7 +3,7 @@ package com.nextdigital.oncall.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -33,6 +33,12 @@ import lombok.extern.slf4j.Slf4j;
 public class CallSyncServiceImpl implements CallSyncService {
 
     private static final DateTimeFormatter ZADARMA_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    /**
+     * Zadarma timestamps and day boundaries use the account timezone
+     * (Europe/Madrid).
+     */
+    private static final ZoneId APP_ZONE = ZoneId.of("Europe/Madrid");
 
     private static final DateTimeFormatter TITLE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale.ROOT);
 
@@ -73,7 +79,7 @@ public class CallSyncServiceImpl implements CallSyncService {
         if (startDate == null || endDate == null) {
             return false;
         }
-        if (!endDate.isBefore(LocalDate.now(ZoneOffset.UTC))) {
+        if (!endDate.isBefore(LocalDate.now(APP_ZONE))) {
             return false; // range includes today or future — always refresh
         }
         long expectedDays = ChronoUnit.DAYS.between(startDate, endDate) + 1;
@@ -121,7 +127,7 @@ public class CallSyncServiceImpl implements CallSyncService {
         if (startDate == null || endDate == null) {
             return;
         }
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        LocalDate today = LocalDate.now(APP_ZONE);
         LocalDate cursor = startDate;
         while (!cursor.isAfter(endDate)) {
             if (cursor.isBefore(today)) { // only mark fully-past days
@@ -130,7 +136,7 @@ public class CallSyncServiceImpl implements CallSyncService {
                     syncedDayRepository.save(
                             ZadarmaSyncedDay.builder()
                                     .id(dayId)
-                                    .syncedAt(OffsetDateTime.now(ZoneOffset.UTC))
+                                    .syncedAt(OffsetDateTime.now(APP_ZONE))
                                     .build());
                 }
             }
@@ -146,25 +152,24 @@ public class CallSyncServiceImpl implements CallSyncService {
         if (!"answered".equals(call.getDisposition())) {
             return;
         }
-        if (group == null || group.getApplications().isEmpty()) {
-            log.debug("Answered call {} has no associated application — skipping draft incident",
+        if (group == null) {
+            log.debug("Answered call {} has no associated on-call group — skipping draft incident",
                     call.getExternalCallId());
             return;
         }
         try {
-            var application = group.getApplications().iterator().next();
             var title = "Llamada atendida vía SIP %s – %s".formatted(
                     call.getSipId(), call.getCallStartedAt().format(TITLE_FMT));
-            // calls NOT linked here — avoids FK ordering issue within the same transaction;
-            // the user links them manually from the Incidents tab
+            // Application is intentionally left empty: only the user knows which
+            // application is affected and assigns it when editing the incident.
+            // Calls are NOT linked here — avoids FK ordering issue within the same
+            // transaction; the user links them manually.
             var incident = Incident.builder()
                     .title(title)
-                    .application(application)
                     .startedAt(call.getCallStartedAt())
                     .build();
             incidentRepository.save(incident);
-            log.info("Draft incident created for answered call {} (app: {})",
-                    call.getExternalCallId(), application.getName());
+            log.info("Draft incident created for answered call {}", call.getExternalCallId());
         } catch (Exception e) {
             log.warn("Could not auto-create draft incident for call {}: {}",
                     call.getExternalCallId(), e.getMessage());
@@ -208,7 +213,7 @@ public class CallSyncServiceImpl implements CallSyncService {
             return null;
         }
         try {
-            return LocalDateTime.parse(dateStr, ZADARMA_FMT).atOffset(ZoneOffset.UTC);
+            return LocalDateTime.parse(dateStr, ZADARMA_FMT).atZone(APP_ZONE).toOffsetDateTime();
         } catch (Exception e) {
             log.warn("Could not parse datetime string: '{}'", dateStr);
             return null;

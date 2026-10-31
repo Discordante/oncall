@@ -6,21 +6,20 @@ import java.util.UUID;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 @Schema(description = "Solicitud para crear o actualizar una incidencia")
 public record IncidentRequest(
-        @NotBlank(message = "El título es obligatorio") @Schema(description = "Título de la incidencia", example = "Caída del servidor de producción") String title,
+                @NotBlank(message = "El título es obligatorio") @Schema(description = "Título de la incidencia", example = "Caída del servidor de producción") String title,
 
-        @NotNull(message = "La aplicación es obligatoria") @Schema(description = "ID de la aplicación afectada") UUID applicationId,
+                @Schema(description = "ID de la aplicación afectada (opcional, se puede asignar al editar)") UUID applicationId,
 
-        @Schema(description = "Descripción detallada de la incidencia") String description,
+                @Schema(description = "Descripción detallada de la incidencia") String description,
 
-        @Schema(description = "Indica si se abrió bridge con el proveedor") boolean bridgeOpened,
+                @Schema(description = "Indica si se abrió bridge con el proveedor") boolean bridgeOpened,
 
-        @Schema(description = "Fecha y hora de inicio (manual, solo cuando no se vinculan llamadas)") OffsetDateTime startedAt,
+                @Schema(description = "Fecha y hora de inicio (manual, solo cuando no se vinculan llamadas)") OffsetDateTime startedAt,
 
-        @Schema(description = "Fecha y hora de resolución") OffsetDateTime endedAt,
+                @Schema(description = "Fecha y hora de fin (opcional, null mientras siga abierta)") OffsetDateTime endedAt,
 
-        @Schema(description = "IDs de llamadas de Zadarma vinculadas a esta incidencia (0..N)") List<UUID> callRecordIds) {
+                @Schema(description = "IDs de llamadas de Zadarma vinculadas a esta incidencia (0..N)") List<UUID> callRecordIds) {
 }
