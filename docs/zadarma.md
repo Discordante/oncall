@@ -153,6 +153,24 @@ Esto borra la fila en `zadarma_configs` (via `orphanRemoval=true`).
 | `GET` | `/api/v1/zadarma/sip-redirections[?id=...]` | Estado actual de la redirección (destino, condición, etc.) |
 | `GET` | `/api/v1/zadarma/calls-summary[?start=&end=&sip=]` | Estadísticas de llamadas entrantes |
 
+### Clasificación de llamadas de comprobación
+
+`calls-summary` devuelve en cada registro el campo `checkCall`. Vale `true` cuando el número de **origen** de la llamada pertenece a una persona dada de alta en la aplicación (`people.phone_number`), es decir, se trata de una llamada de comprobación y no de una llamada real de un cliente. La comparación normaliza ambos números a sus 9 dígitos significativos, por lo que `+34 600 000 001`, `34600000001` y `600000001` se consideran el mismo número.
+
+La pestaña de llamadas del panel muestra estas llamadas con el estado **Comprobación** y no las contabiliza como *Atendidas* ni *No atendidas*.
+
+---
+
+## Creación automática de incidencias
+
+Al sincronizar llamadas desde Zadarma (`CallSyncServiceImpl`), se crea una incidencia en borrador **solo** cuando:
+
+1. La llamada tiene `disposition = answered` (atendida), y
+2. La llamada **no** es de comprobación (`checkCall = false`), es decir, su origen no es el teléfono de una persona de alta, y
+3. El SIP de la llamada pertenece a un grupo de guardia.
+
+La incidencia se crea sin aplicación asignada (el usuario la asigna al editarla) y la llamada no se vincula automáticamente.
+
 ---
 
 ## Flujo completo de redirección
