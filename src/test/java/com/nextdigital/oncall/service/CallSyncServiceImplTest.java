@@ -28,6 +28,7 @@ import com.nextdigital.oncall.entity.ZadarmaCall;
 
 import com.nextdigital.oncall.repository.IncidentRepository;
 import com.nextdigital.oncall.repository.OnCallGroupRepository;
+import com.nextdigital.oncall.repository.PersonRepository;
 import com.nextdigital.oncall.repository.ZadarmaCallRepository;
 import com.nextdigital.oncall.repository.ZadarmaSyncedDayRepository;
 import com.nextdigital.oncall.zadarma.client.ZadarmaReadonlyClient;
@@ -48,6 +49,8 @@ class CallSyncServiceImplTest {
     OnCallGroupRepository groupRepository;
     @Mock
     IncidentRepository incidentRepository;
+    @Mock
+    PersonRepository personRepository;
 
     @InjectMocks
     CallSyncServiceImpl service;
@@ -237,5 +240,96 @@ class CallSyncServiceImplTest {
         service.getCallRecords(START, END, SIP);
 
         verify(incidentRepository, never()).save(any());
+    }
+
+    @Test
+    void answeredCall_fromRegisteredPersonPhone_doesNotCreateDraftIncident() {
+        when(syncedDayRepository.countCoveredDays(eq(SIP), any(), any())).thenReturn(0L);
+        when(zadarmaReadonlyClient.getStatistics(START, END, SIP)).thenReturn(statsWithOneRecord());
+        when(callRepository.existsByExternalCallId("ext-1")).thenReturn(false);
+        // 34600000001 (caller) matches the person's phone in a different format
+        when(personRepository.findAllPhoneNumbers()).thenReturn(List.of("+34 600 000 001"));
+
+        var group = OnCallGroup.builder()
+                .id(java.util.UUID.randomUUID())
+                .name("Guardia test")
+                .build();
+        when(groupRepository.findByZadarmaConfigSipId(SIP)).thenReturn(Optional.of(group));
+
+        var savedCall = ZadarmaCall.builder()
+                .id(java.util.UUID.randomUUID())
+                .externalCallId("ext-1").sipId(SIP)
+                .callerNumber("34600000001")
+                .callStartedAt(OffsetDateTime.parse("2026-09-05T10:00:00Z"))
+                .billSeconds(60).disposition("answered")
+                .build();
+        when(callRepository.save(any())).thenReturn(savedCall);
+        when(callRepository.findByCallStartedAtBetweenAndSipId(any(), any(), eq(SIP))).thenReturn(List.of());
+
+        service.getCallRecords(START, END, SIP);
+
+        verify(incidentRepository, never()).save(any());
+    }
+
+    @Test
+    void answeredCall_fromUnregisteredNumber_createsDraftIncident() {
+        when(syncedDayRepository.countCoveredDays(eq(SIP), any(), any())).thenReturn(0L);
+        when(zadarmaReadonlyClient.getStatistics(START, END, SIP)).thenReturn(statsWithOneRecord());
+        when(callRepository.existsByExternalCallId("ext-1")).thenReturn(false);
+        when(personRepository.findAllPhoneNumbers()).thenReturn(List.of("34600999888"));
+
+        var group = OnCallGroup.builder()
+                .id(java.util.UUID.randomUUID())
+                .name("Guardia test")
+                .build();
+        when(groupRepository.findByZadarmaConfigSipId(SIP)).thenReturn(Optional.of(group));
+
+        var savedCall = ZadarmaCall.builder()
+                .id(java.util.UUID.randomUUID())
+                .externalCallId("ext-1").sipId(SIP)
+                .callerNumber("34600000001")
+                .callStartedAt(OffsetDateTime.parse("2026-09-05T10:00:00Z"))
+                .billSeconds(60).disposition("answered")
+                .build();
+        when(callRepository.save(any())).thenReturn(savedCall);
+        when(incidentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(callRepository.findByCallStartedAtBetweenAndSipId(any(), any(), eq(SIP))).thenReturn(List.of());
+
+        service.getCallRecords(START, END, SIP);
+
+        verify(incidentRepository).save(any());
+    }
+
+    @Test
+    void getCallRecords_flagsCallsFromRegisteredPersonPhonesAsCheck() {
+        when(syncedDayRepository.countCoveredDays(eq(SIP), any(), any())).thenReturn(30L);
+        when(personRepository.findAllPhoneNumbers())
+                .thenReturn(List.of("600000001", "911222333"));
+        var checkCall = ZadarmaCall.builder()
+                .id(java.util.UUID.randomUUID())
+                .externalCallId("ext-check")
+                .sipId(SIP)
+                .callerNumber("34600000001")
+                .callStartedAt(OffsetDateTime.parse("2026-09-05T10:00:00Z"))
+                .billSeconds(30)
+                .disposition("answered")
+                .build();
+        var realCall = ZadarmaCall.builder()
+                .id(java.util.UUID.randomUUID())
+                .externalCallId("ext-real")
+                .sipId(SIP)
+                .callerNumber("34900000000")
+                .callStartedAt(OffsetDateTime.parse("2026-09-05T11:00:00Z"))
+                .billSeconds(90)
+                .disposition("answered")
+                .build();
+        when(callRepository.findByCallStartedAtBetweenAndSipId(any(), any(), eq(SIP)))
+                .thenReturn(List.of(checkCall, realCall));
+
+        var result = service.getCallRecords(START, END, SIP);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).checkCall()).isTrue();
+        assertThat(result.get(1).checkCall()).isFalse();
     }
 }

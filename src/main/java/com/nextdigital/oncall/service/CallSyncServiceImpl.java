@@ -8,6 +8,9 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +23,7 @@ import com.nextdigital.oncall.entity.ZadarmaSyncedDay;
 import com.nextdigital.oncall.mapper.ZadarmaCallMapper;
 import com.nextdigital.oncall.repository.IncidentRepository;
 import com.nextdigital.oncall.repository.OnCallGroupRepository;
+import com.nextdigital.oncall.repository.PersonRepository;
 import com.nextdigital.oncall.repository.ZadarmaCallRepository;
 import com.nextdigital.oncall.repository.ZadarmaSyncedDayRepository;
 import com.nextdigital.oncall.zadarma.client.ZadarmaReadonlyClient;
@@ -47,6 +51,7 @@ public class CallSyncServiceImpl implements CallSyncService {
     private final ZadarmaSyncedDayRepository syncedDayRepository;
     private final OnCallGroupRepository groupRepository;
     private final IncidentRepository incidentRepository;
+    private final PersonRepository personRepository;
 
     @Override
     @Transactional
@@ -106,11 +111,12 @@ public class CallSyncServiceImpl implements CallSyncService {
                 : null;
 
         int newRecords = 0;
+        var checkNumbers = loadCheckNumbers();
         for (var record : response.stats()) {
             if (!callRepository.existsByExternalCallId(record.id())) {
                 var saved = callRepository.save(ZadarmaCallMapper.toEntity(record, group));
                 newRecords++;
-                tryCreateDraftIncident(saved, group);
+                tryCreateDraftIncident(saved, group, checkNumbers);
             }
         }
         log.info("Zadarma sync: {} new records persisted (range=[{}, {}] sip={})", newRecords, start, end, sip);
@@ -145,11 +151,16 @@ public class CallSyncServiceImpl implements CallSyncService {
     }
 
     // ─────────────────────────────────────────────
-    // Auto draft incident for answered calls
+    // Auto draft incident for answered, non-check calls
     // ─────────────────────────────────────────────
 
-    private void tryCreateDraftIncident(ZadarmaCall call, OnCallGroup group) {
+    private void tryCreateDraftIncident(ZadarmaCall call, OnCallGroup group, Set<String> checkNumbers) {
         if (!"answered".equals(call.getDisposition())) {
+            return;
+        }
+        if (isCheckCall(call, checkNumbers)) {
+            log.info("Answered call {} originates from a registered person phone — skipping draft incident",
+                    call.getExternalCallId());
             return;
         }
         if (group == null) {
@@ -189,7 +200,55 @@ public class CallSyncServiceImpl implements CallSyncService {
         List<com.nextdigital.oncall.entity.ZadarmaCall> records = (sip != null && !sip.isBlank())
                 ? callRepository.findByCallStartedAtBetweenAndSipId(startDt, endDt, sip)
                 : callRepository.findByCallStartedAtBetween(startDt, endDt);
-        return records.stream().map(ZadarmaCallMapper::toResponse).toList();
+        var checkNumbers = loadCheckNumbers();
+        return records.stream()
+                .map(record -> ZadarmaCallMapper.toResponse(record, isCheckCall(record, checkNumbers)))
+                .toList();
+    }
+
+    // ─────────────────────────────────────────────
+    // Check-call detection
+    // ─────────────────────────────────────────────
+
+    /**
+     * Loads the normalized phone numbers of every person registered in the
+     * application. A call whose origin is one of those numbers is considered a
+     * "comprobación" call (a check performed by a registered user), not a real
+     * inbound call.
+     */
+    private Set<String> loadCheckNumbers() {
+        List<String> phoneNumbers = personRepository.findAllPhoneNumbers();
+        if (phoneNumbers == null) {
+            return Set.of();
+        }
+        return phoneNumbers.stream()
+                .map(CallSyncServiceImpl::normalizePhone)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+    }
+
+    private static boolean isCheckCall(ZadarmaCall call, Set<String> checkNumbers) {
+        if (checkNumbers.isEmpty()) {
+            return false;
+        }
+        var caller = normalizePhone(call.getCallerNumber());
+        return caller != null && checkNumbers.contains(caller);
+    }
+
+    /**
+     * Reduces a phone number to its 9 significant digits (Spanish numbering
+     * plan), so {@code +34 600 000 001}, {@code 34600000001} and
+     * {@code 600000001} all match.
+     */
+    private static String normalizePhone(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        var digits = raw.replaceAll("\\D", "");
+        if (digits.isEmpty()) {
+            return null;
+        }
+        return digits.length() > 9 ? digits.substring(digits.length() - 9) : digits;
     }
 
     // ─────────────────────────────────────────────

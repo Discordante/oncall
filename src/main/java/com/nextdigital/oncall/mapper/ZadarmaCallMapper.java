@@ -38,7 +38,11 @@ public final class ZadarmaCallMapper {
                 .build();
     }
 
-    public static CallRecordResponse toResponse(ZadarmaCall entity) {
+    /**
+     * @param checkCall whether the call originated from the phone of a person
+     *                  registered in the application (a "comprobación" call)
+     */
+    public static CallRecordResponse toResponse(ZadarmaCall entity, boolean checkCall) {
         var group = entity.getOnCallGroup();
         var incident = entity.getIncidents().stream()
                 .min(Comparator.comparing(Incident::getCreatedAt,
@@ -70,7 +74,8 @@ public final class ZadarmaCallMapper {
                 application != null ? application.getId() : null,
                 application != null ? application.getName() : null,
                 applicationNames,
-                entity.getCreatedAt());
+                entity.getCreatedAt(),
+                checkCall);
     }
 
     private static OffsetDateTime parseCallStart(String callstart) {
