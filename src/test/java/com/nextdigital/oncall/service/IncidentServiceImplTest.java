@@ -96,7 +96,8 @@ class IncidentServiceImplTest {
     @Test
     void create_withNoCalls_usesManualStartedAt() {
         var startedAt = OffsetDateTime.parse("2026-10-05T09:00:00Z");
-        var request = new IncidentRequest("Test incident", application.getId(), null, false, startedAt, null, null, null);
+        var request = new IncidentRequest("Test incident", application.getId(), null, false, startedAt, null, null,
+                null);
 
         when(applicationRepository.findById(application.getId())).thenReturn(Optional.of(application));
         when(incidentRepository.save(any())).thenAnswer(i -> i.getArgument(0));

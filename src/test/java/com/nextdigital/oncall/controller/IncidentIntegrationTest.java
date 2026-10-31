@@ -45,307 +45,314 @@ import tools.jackson.databind.ObjectMapper;
 @Import(TestcontainersConfig.class)
 class IncidentIntegrationTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+        @Autowired
+        private ObjectMapper objectMapper;
 
-    @Autowired
-    private ApplicationRepository applicationRepository;
+        @Autowired
+        private ApplicationRepository applicationRepository;
 
-    @Autowired
-    private ZadarmaCallRepository callRepository;
+        @Autowired
+        private ZadarmaCallRepository callRepository;
 
-    @Autowired
-    private IncidentRepository incidentRepository;
+        @Autowired
+        private IncidentRepository incidentRepository;
 
-    @Autowired
-    private OnCallGroupRepository groupRepository;
+        @Autowired
+        private OnCallGroupRepository groupRepository;
 
-    // Prevent ZadarmaReadonlyClient from calling real API during context startup
-    @MockitoBean
-    private ZadarmaReadonlyClient zadarmaReadonlyClient;
+        // Prevent ZadarmaReadonlyClient from calling real API during context startup
+        @MockitoBean
+        private ZadarmaReadonlyClient zadarmaReadonlyClient;
 
-    private Application testApp;
-    private ZadarmaCall testCall;
+        private Application testApp;
+        private ZadarmaCall testCall;
 
-    @BeforeEach
-    void setUp() {
-        incidentRepository.deleteAll(); // cascades incident_call_records
-        callRepository.deleteAll();
+        @BeforeEach
+        void setUp() {
+                incidentRepository.deleteAll(); // cascades incident_call_records
+                callRepository.deleteAll();
 
-        testApp = applicationRepository.save(
-                Application.builder()
-                        .name("IncidentTest App " + UUID.randomUUID())
-                        .description("Integration test app")
-                        .build());
+                testApp = applicationRepository.save(
+                                Application.builder()
+                                                .name("IncidentTest App " + UUID.randomUUID())
+                                                .description("Integration test app")
+                                                .build());
 
-        testCall = callRepository.save(
-                ZadarmaCall.builder()
-                        .externalCallId("ext-incident-test-" + UUID.randomUUID())
-                        .sipId("921495")
-                        .callerNumber("34600000001")
-                        .destinationNumber("34921495")
-                        .callStartedAt(OffsetDateTime.parse("2026-10-05T10:00:00Z"))
-                        .billSeconds(90)
-                        .disposition("answered")
-                        .build());
-    }
+                testCall = callRepository.save(
+                                ZadarmaCall.builder()
+                                                .externalCallId("ext-incident-test-" + UUID.randomUUID())
+                                                .sipId("921495")
+                                                .callerNumber("34600000001")
+                                                .destinationNumber("34921495")
+                                                .callStartedAt(OffsetDateTime.parse("2026-10-05T10:00:00Z"))
+                                                .billSeconds(90)
+                                                .disposition("answered")
+                                                .build());
+        }
 
-    @Test
-    void create_withNoCalls_startedAtIsNull() throws Exception {
-        var request = new IncidentRequest(
-                "Server down", testApp.getId(), "Main server crashed", true, null, null, null, null);
+        @Test
+        void create_withNoCalls_startedAtIsNull() throws Exception {
+                var request = new IncidentRequest(
+                                "Server down", testApp.getId(), "Main server crashed", true, null, null, null, null);
 
-        var result = mockMvc.perform(post("/api/v1/incidents")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-                .with(jwt()))
-                .andExpect(status().isCreated())
-                .andReturn();
+                var result = mockMvc.perform(post("/api/v1/incidents")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                                .with(jwt()))
+                                .andExpect(status().isCreated())
+                                .andReturn();
 
-        var response = parse(result.getResponse().getContentAsString());
+                var response = parse(result.getResponse().getContentAsString());
 
-        assertThat(response.data().startedAt()).isNull();
-        assertThat(response.data().linkedCallsCount()).isZero();
-        assertThat(response.data().applicationName()).isEqualTo(testApp.getName());
-        assertThat(response.data().bridgeOpened()).isTrue();
-        assertThat(response.data().durationSeconds()).isNull();
-    }
+                assertThat(response.data().startedAt()).isNull();
+                assertThat(response.data().linkedCallsCount()).isZero();
+                assertThat(response.data().applicationName()).isEqualTo(testApp.getName());
+                assertThat(response.data().bridgeOpened()).isTrue();
+                assertThat(response.data().durationSeconds()).isNull();
+        }
 
-    @Test
-    void create_withManualStartedAt_storesIt() throws Exception {
-        var startedAt = OffsetDateTime.parse("2026-10-05T09:30:00Z");
-        var request = new IncidentRequest("DB outage", testApp.getId(), null, false, startedAt, null, null, null);
+        @Test
+        void create_withManualStartedAt_storesIt() throws Exception {
+                var startedAt = OffsetDateTime.parse("2026-10-05T09:30:00Z");
+                var request = new IncidentRequest("DB outage", testApp.getId(), null, false, startedAt, null, null,
+                                null);
 
-        var result = mockMvc.perform(post("/api/v1/incidents")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-                .with(jwt()))
-                .andExpect(status().isCreated())
-                .andReturn();
+                var result = mockMvc.perform(post("/api/v1/incidents")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                                .with(jwt()))
+                                .andExpect(status().isCreated())
+                                .andReturn();
 
-        var response = parse(result.getResponse().getContentAsString());
+                var response = parse(result.getResponse().getContentAsString());
 
-        assertThat(response.data().startedAt()).isEqualTo(startedAt);
-    }
+                assertThat(response.data().startedAt()).isEqualTo(startedAt);
+        }
 
-    @Test
-    void create_withCalls_startedAtAutoFromCall() throws Exception {
-        var request = new IncidentRequest(
-                "Network issue", testApp.getId(), null, false, null, null, List.of(testCall.getId()), null);
+        @Test
+        void create_withCalls_startedAtAutoFromCall() throws Exception {
+                var request = new IncidentRequest(
+                                "Network issue", testApp.getId(), null, false, null, null, List.of(testCall.getId()),
+                                null);
 
-        var result = mockMvc.perform(post("/api/v1/incidents")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-                .with(jwt()))
-                .andExpect(status().isCreated())
-                .andReturn();
+                var result = mockMvc.perform(post("/api/v1/incidents")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                                .with(jwt()))
+                                .andExpect(status().isCreated())
+                                .andReturn();
 
-        var response = parse(result.getResponse().getContentAsString());
+                var response = parse(result.getResponse().getContentAsString());
 
-        assertThat(response.data().startedAt()).isEqualTo(testCall.getCallStartedAt());
-        assertThat(response.data().linkedCallsCount()).isEqualTo(1);
-    }
+                assertThat(response.data().startedAt()).isEqualTo(testCall.getCallStartedAt());
+                assertThat(response.data().linkedCallsCount()).isEqualTo(1);
+        }
 
-    @Test
-    void linkCall_populatesStartedAtAutomatically() throws Exception {
-        var incidentId = createIncidentWithoutCalls();
+        @Test
+        void linkCall_populatesStartedAtAutomatically() throws Exception {
+                var incidentId = createIncidentWithoutCalls();
 
-        // Before link — startedAt is null
-        var before = getIncident(incidentId);
-        assertThat(before.startedAt()).isNull();
+                // Before link — startedAt is null
+                var before = getIncident(incidentId);
+                assertThat(before.startedAt()).isNull();
 
-        // Link the call
-        var linked = mockMvc.perform(post("/api/v1/incidents/{id}/calls/{callId}", incidentId, testCall.getId())
-                .with(jwt()))
-                .andExpect(status().isOk())
-                .andReturn();
+                // Link the call
+                var linked = mockMvc.perform(post("/api/v1/incidents/{id}/calls/{callId}", incidentId, testCall.getId())
+                                .with(jwt()))
+                                .andExpect(status().isOk())
+                                .andReturn();
 
-        var response = parse(linked.getResponse().getContentAsString());
-        assertThat(response.data().startedAt()).isEqualTo(testCall.getCallStartedAt());
-        assertThat(response.data().linkedCallsCount()).isEqualTo(1);
-    }
+                var response = parse(linked.getResponse().getContentAsString());
+                assertThat(response.data().startedAt()).isEqualTo(testCall.getCallStartedAt());
+                assertThat(response.data().linkedCallsCount()).isEqualTo(1);
+        }
 
-    @Test
-    void unlinkLastCall_setsStartedAtToNull() throws Exception {
-        // Create with call → startedAt auto-populated
-        var request = new IncidentRequest(
-                "Test", testApp.getId(), null, false, null, null, List.of(testCall.getId()), null);
-        var createResult = mockMvc.perform(post("/api/v1/incidents")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-                .with(jwt()))
-                .andExpect(status().isCreated())
-                .andReturn();
-        UUID incidentId = parse(createResult.getResponse().getContentAsString()).data().id();
+        @Test
+        void unlinkLastCall_setsStartedAtToNull() throws Exception {
+                // Create with call → startedAt auto-populated
+                var request = new IncidentRequest(
+                                "Test", testApp.getId(), null, false, null, null, List.of(testCall.getId()), null);
+                var createResult = mockMvc.perform(post("/api/v1/incidents")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                                .with(jwt()))
+                                .andExpect(status().isCreated())
+                                .andReturn();
+                UUID incidentId = parse(createResult.getResponse().getContentAsString()).data().id();
 
-        assertThat(getIncident(incidentId).startedAt()).isNotNull();
+                assertThat(getIncident(incidentId).startedAt()).isNotNull();
 
-        // Unlink
-        mockMvc.perform(delete("/api/v1/incidents/{id}/calls/{callId}", incidentId, testCall.getId())
-                .with(jwt()))
-                .andExpect(status().isNoContent());
+                // Unlink
+                mockMvc.perform(delete("/api/v1/incidents/{id}/calls/{callId}", incidentId, testCall.getId())
+                                .with(jwt()))
+                                .andExpect(status().isNoContent());
 
-        assertThat(getIncident(incidentId).startedAt()).isNull();
-        assertThat(getIncident(incidentId).linkedCallsCount()).isZero();
-    }
+                assertThat(getIncident(incidentId).startedAt()).isNull();
+                assertThat(getIncident(incidentId).linkedCallsCount()).isZero();
+        }
 
-    @Test
-    void durationSeconds_computedFromStartedAtAndEndedAt() throws Exception {
-        var startedAt = OffsetDateTime.parse("2026-10-05T10:00:00Z");
-        var endedAt = OffsetDateTime.parse("2026-10-05T11:30:00Z"); // 5400 seconds
-        var request = new IncidentRequest("Test", testApp.getId(), null, false, startedAt, endedAt, null, null);
+        @Test
+        void durationSeconds_computedFromStartedAtAndEndedAt() throws Exception {
+                var startedAt = OffsetDateTime.parse("2026-10-05T10:00:00Z");
+                var endedAt = OffsetDateTime.parse("2026-10-05T11:30:00Z"); // 5400 seconds
+                var request = new IncidentRequest("Test", testApp.getId(), null, false, startedAt, endedAt, null, null);
 
-        var result = mockMvc.perform(post("/api/v1/incidents")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-                .with(jwt()))
-                .andExpect(status().isCreated())
-                .andReturn();
+                var result = mockMvc.perform(post("/api/v1/incidents")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                                .with(jwt()))
+                                .andExpect(status().isCreated())
+                                .andReturn();
 
-        assertThat(parse(result.getResponse().getContentAsString()).data().durationSeconds()).isEqualTo(5400L);
-    }
+                assertThat(parse(result.getResponse().getContentAsString()).data().durationSeconds()).isEqualTo(5400L);
+        }
 
-    @Test
-    void update_replacesCallsAndRecalculatesStartedAt() throws Exception {
-        // Create with no calls
-        var incidentId = createIncidentWithoutCalls();
+        @Test
+        void update_replacesCallsAndRecalculatesStartedAt() throws Exception {
+                // Create with no calls
+                var incidentId = createIncidentWithoutCalls();
 
-        // Update with a call
-        var updateRequest = new IncidentRequest(
-                "Updated title", testApp.getId(), "desc", false, null, null, List.of(testCall.getId()), null);
-        var updateResult = mockMvc.perform(put("/api/v1/incidents/{id}", incidentId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(updateRequest))
-                .with(jwt()))
-                .andExpect(status().isOk())
-                .andReturn();
+                // Update with a call
+                var updateRequest = new IncidentRequest(
+                                "Updated title", testApp.getId(), "desc", false, null, null, List.of(testCall.getId()),
+                                null);
+                var updateResult = mockMvc.perform(put("/api/v1/incidents/{id}", incidentId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(updateRequest))
+                                .with(jwt()))
+                                .andExpect(status().isOk())
+                                .andReturn();
 
-        var updated = parse(updateResult.getResponse().getContentAsString()).data();
-        assertThat(updated.title()).isEqualTo("Updated title");
-        assertThat(updated.startedAt()).isEqualTo(testCall.getCallStartedAt());
-        assertThat(updated.linkedCallsCount()).isEqualTo(1);
-    }
+                var updated = parse(updateResult.getResponse().getContentAsString()).data();
+                assertThat(updated.title()).isEqualTo("Updated title");
+                assertThat(updated.startedAt()).isEqualTo(testCall.getCallStartedAt());
+                assertThat(updated.linkedCallsCount()).isEqualTo(1);
+        }
 
-    @Test
-    void getById_returns404WhenNotFound() throws Exception {
-        mockMvc.perform(get("/api/v1/incidents/{id}", UUID.randomUUID()).with(jwt()))
-                .andExpect(status().isNotFound());
-    }
+        @Test
+        void getById_returns404WhenNotFound() throws Exception {
+                mockMvc.perform(get("/api/v1/incidents/{id}", UUID.randomUUID()).with(jwt()))
+                                .andExpect(status().isNotFound());
+        }
 
-    @Test
-    void delete_removesIncident() throws Exception {
-        var incidentId = createIncidentWithoutCalls();
+        @Test
+        void delete_removesIncident() throws Exception {
+                var incidentId = createIncidentWithoutCalls();
 
-        mockMvc.perform(delete("/api/v1/incidents/{id}", incidentId).with(jwt()))
-                .andExpect(status().isNoContent());
+                mockMvc.perform(delete("/api/v1/incidents/{id}", incidentId).with(jwt()))
+                                .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/v1/incidents/{id}", incidentId).with(jwt()))
-                .andExpect(status().isNotFound());
-    }
+                mockMvc.perform(get("/api/v1/incidents/{id}", incidentId).with(jwt()))
+                                .andExpect(status().isNotFound());
+        }
 
-    @Test
-    void create_returns400WhenTitleIsBlank() throws Exception {
-        var request = new IncidentRequest("", testApp.getId(), null, false, null, null, null, null);
+        @Test
+        void create_returns400WhenTitleIsBlank() throws Exception {
+                var request = new IncidentRequest("", testApp.getId(), null, false, null, null, null, null);
 
-        mockMvc.perform(post("/api/v1/incidents")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-                .with(jwt()))
-                .andExpect(status().isBadRequest());
-    }
+                mockMvc.perform(post("/api/v1/incidents")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                                .with(jwt()))
+                                .andExpect(status().isBadRequest());
+        }
 
-    @Test
-    void create_returns404WhenApplicationNotFound() throws Exception {
-        var request = new IncidentRequest("Test", UUID.randomUUID(), null, false, null, null, null, null);
+        @Test
+        void create_returns404WhenApplicationNotFound() throws Exception {
+                var request = new IncidentRequest("Test", UUID.randomUUID(), null, false, null, null, null, null);
 
-        mockMvc.perform(post("/api/v1/incidents")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-                .with(jwt()))
-                .andExpect(status().isNotFound());
-    }
+                mockMvc.perform(post("/api/v1/incidents")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                                .with(jwt()))
+                                .andExpect(status().isNotFound());
+        }
 
-    @Test
-    void findAll_returnsOnlyIncidentsOfTheRequestedGroup() throws Exception {
-        var groupA = groupRepository.save(OnCallGroup.builder()
-                .name("Group A " + UUID.randomUUID()).build());
-        var groupB = groupRepository.save(OnCallGroup.builder()
-                .name("Group B " + UUID.randomUUID()).build());
+        @Test
+        void findAll_returnsOnlyIncidentsOfTheRequestedGroup() throws Exception {
+                var groupA = groupRepository.save(OnCallGroup.builder()
+                                .name("Group A " + UUID.randomUUID()).build());
+                var groupB = groupRepository.save(OnCallGroup.builder()
+                                .name("Group B " + UUID.randomUUID()).build());
 
-        createIncidentInGroup("Incident A", groupA.getId());
-        createIncidentInGroup("Incident B", groupB.getId());
+                createIncidentInGroup("Incident A", groupA.getId());
+                createIncidentInGroup("Incident B", groupB.getId());
 
-        mockMvc.perform(get("/api/v1/incidents")
-                .param("onCallGroupId", groupA.getId().toString())
-                .with(jwt()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.content", hasSize(1)))
-                .andExpect(jsonPath("$.data.content[0].title").value("Incident A"))
-                .andExpect(jsonPath("$.data.content[0].onCallGroupId").value(groupA.getId().toString()));
-    }
+                mockMvc.perform(get("/api/v1/incidents")
+                                .param("onCallGroupId", groupA.getId().toString())
+                                .with(jwt()))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.data.content", hasSize(1)))
+                                .andExpect(jsonPath("$.data.content[0].title").value("Incident A"))
+                                .andExpect(jsonPath("$.data.content[0].onCallGroupId")
+                                                .value(groupA.getId().toString()));
+        }
 
-    @Test
-    void findAll_filtersByStartDateRange() throws Exception {
-        var group = groupRepository.save(OnCallGroup.builder()
-                .name("Group D " + UUID.randomUUID()).build());
+        @Test
+        void findAll_filtersByStartDateRange() throws Exception {
+                var group = groupRepository.save(OnCallGroup.builder()
+                                .name("Group D " + UUID.randomUUID()).build());
 
-        createIncidentInGroupWithStart("Inside range", group.getId(), OffsetDateTime.parse("2026-10-05T10:00:00Z"));
-        createIncidentInGroupWithStart("Outside range", group.getId(), OffsetDateTime.parse("2026-07-05T10:00:00Z"));
+                createIncidentInGroupWithStart("Inside range", group.getId(),
+                                OffsetDateTime.parse("2026-10-05T10:00:00Z"));
+                createIncidentInGroupWithStart("Outside range", group.getId(),
+                                OffsetDateTime.parse("2026-07-05T10:00:00Z"));
 
-        mockMvc.perform(get("/api/v1/incidents")
-                .param("onCallGroupId", group.getId().toString())
-                .param("startedFrom", "2026-09-01T00:00:00Z")
-                .param("startedTo", "2026-10-31T23:59:59Z")
-                .with(jwt()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.content", hasSize(1)))
-                .andExpect(jsonPath("$.data.content[0].title").value("Inside range"));
-    }
+                mockMvc.perform(get("/api/v1/incidents")
+                                .param("onCallGroupId", group.getId().toString())
+                                .param("startedFrom", "2026-09-01T00:00:00Z")
+                                .param("startedTo", "2026-10-31T23:59:59Z")
+                                .with(jwt()))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.data.content", hasSize(1)))
+                                .andExpect(jsonPath("$.data.content[0].title").value("Inside range"));
+        }
 
-    // ── helpers ──────────────────────────────────
+        // ── helpers ──────────────────────────────────
 
-    private UUID createIncidentWithoutCalls() throws Exception {
-        var request = new IncidentRequest("Test incident", testApp.getId(), null, false, null, null, null, null);
-        var result = mockMvc.perform(post("/api/v1/incidents")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-                .with(jwt()))
-                .andExpect(status().isCreated())
-                .andReturn();
-        return parse(result.getResponse().getContentAsString()).data().id();
-    }
+        private UUID createIncidentWithoutCalls() throws Exception {
+                var request = new IncidentRequest("Test incident", testApp.getId(), null, false, null, null, null,
+                                null);
+                var result = mockMvc.perform(post("/api/v1/incidents")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                                .with(jwt()))
+                                .andExpect(status().isCreated())
+                                .andReturn();
+                return parse(result.getResponse().getContentAsString()).data().id();
+        }
 
-    private void createIncidentInGroup(String title, UUID groupId) throws Exception {
-        var request = new IncidentRequest(title, null, null, false, null, null, null, groupId);
-        mockMvc.perform(post("/api/v1/incidents")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-                .with(jwt()))
-                .andExpect(status().isCreated());
-    }
+        private void createIncidentInGroup(String title, UUID groupId) throws Exception {
+                var request = new IncidentRequest(title, null, null, false, null, null, null, groupId);
+                mockMvc.perform(post("/api/v1/incidents")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                                .with(jwt()))
+                                .andExpect(status().isCreated());
+        }
 
-    private void createIncidentInGroupWithStart(String title, UUID groupId, OffsetDateTime startedAt)
-            throws Exception {
-        var request = new IncidentRequest(title, null, null, false, startedAt, null, null, groupId);
-        mockMvc.perform(post("/api/v1/incidents")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request))
-                .with(jwt()))
-                .andExpect(status().isCreated());
-    }
+        private void createIncidentInGroupWithStart(String title, UUID groupId, OffsetDateTime startedAt)
+                        throws Exception {
+                var request = new IncidentRequest(title, null, null, false, startedAt, null, null, groupId);
+                mockMvc.perform(post("/api/v1/incidents")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request))
+                                .with(jwt()))
+                                .andExpect(status().isCreated());
+        }
 
-    private IncidentResponse getIncident(UUID id) throws Exception {
-        var result = mockMvc.perform(get("/api/v1/incidents/{id}", id).with(jwt()))
-                .andExpect(status().isOk())
-                .andReturn();
-        return parse(result.getResponse().getContentAsString()).data();
-    }
+        private IncidentResponse getIncident(UUID id) throws Exception {
+                var result = mockMvc.perform(get("/api/v1/incidents/{id}", id).with(jwt()))
+                                .andExpect(status().isOk())
+                                .andReturn();
+                return parse(result.getResponse().getContentAsString()).data();
+        }
 
-    private ApiResponse<IncidentResponse> parse(String json) throws Exception {
-        return objectMapper.readValue(json, new TypeReference<ApiResponse<IncidentResponse>>() {
-        });
-    }
+        private ApiResponse<IncidentResponse> parse(String json) throws Exception {
+                return objectMapper.readValue(json, new TypeReference<ApiResponse<IncidentResponse>>() {
+                });
+        }
 }
