@@ -10,7 +10,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.List;
@@ -96,7 +96,7 @@ class CallSyncServiceImplTest {
 
     @Test
     void getCallRecords_alwaysFetchesWhenEndDateIsToday() {
-        String todayEnd = LocalDate.now(ZoneOffset.UTC)
+        String todayEnd = LocalDate.now(ZoneId.of("Europe/Madrid"))
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) + " 23:59:59";
         when(zadarmaReadonlyClient.getStatistics(any(), any(), eq(SIP))).thenReturn(emptyStats());
         when(callRepository.findByCallStartedAtBetweenAndSipId(any(), any(), eq(SIP))).thenReturn(List.of());
