@@ -21,5 +21,7 @@ public record IncidentRequest(
 
                 @Schema(description = "Fecha y hora de fin (opcional, null mientras siga abierta)") OffsetDateTime endedAt,
 
-                @Schema(description = "IDs de llamadas de Zadarma vinculadas a esta incidencia (0..N)") List<UUID> callRecordIds) {
+                @Schema(description = "IDs de llamadas de Zadarma vinculadas a esta incidencia (0..N)") List<UUID> callRecordIds,
+
+                @Schema(description = "ID del grupo de guardia al que pertenece la incidencia (opcional al actualizar: si no se envía se conserva el actual)") UUID onCallGroupId) {
 }

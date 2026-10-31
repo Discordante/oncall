@@ -1,5 +1,6 @@
 package com.nextdigital.oncall.service;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -10,7 +11,13 @@ import com.nextdigital.oncall.dto.IncidentResponse;
 
 public interface IncidentService {
 
-    Page<IncidentResponse> findAll(Pageable pageable, UUID applicationId);
+    /**
+     * Lists incidents, optionally filtered by affected application, by owning
+     * on-call group (each group only sees its own incidents) and by start date
+     * range.
+     */
+    Page<IncidentResponse> findAll(Pageable pageable, UUID applicationId, UUID onCallGroupId,
+            OffsetDateTime startedFrom, OffsetDateTime startedTo);
 
     IncidentResponse findById(UUID id);
 

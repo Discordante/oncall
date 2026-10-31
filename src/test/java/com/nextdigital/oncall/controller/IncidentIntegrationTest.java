@@ -1,11 +1,13 @@
 package com.nextdigital.oncall.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.OffsetDateTime;
@@ -27,9 +29,11 @@ import com.nextdigital.oncall.dto.ApiResponse;
 import com.nextdigital.oncall.dto.IncidentRequest;
 import com.nextdigital.oncall.dto.IncidentResponse;
 import com.nextdigital.oncall.entity.Application;
+import com.nextdigital.oncall.entity.OnCallGroup;
 import com.nextdigital.oncall.entity.ZadarmaCall;
 import com.nextdigital.oncall.repository.ApplicationRepository;
 import com.nextdigital.oncall.repository.IncidentRepository;
+import com.nextdigital.oncall.repository.OnCallGroupRepository;
 import com.nextdigital.oncall.repository.ZadarmaCallRepository;
 import com.nextdigital.oncall.zadarma.client.ZadarmaReadonlyClient;
 
@@ -55,6 +59,9 @@ class IncidentIntegrationTest {
 
     @Autowired
     private IncidentRepository incidentRepository;
+
+    @Autowired
+    private OnCallGroupRepository groupRepository;
 
     // Prevent ZadarmaReadonlyClient from calling real API during context startup
     @MockitoBean
@@ -89,7 +96,7 @@ class IncidentIntegrationTest {
     @Test
     void create_withNoCalls_startedAtIsNull() throws Exception {
         var request = new IncidentRequest(
-                "Server down", testApp.getId(), "Main server crashed", true, null, null, null);
+                "Server down", testApp.getId(), "Main server crashed", true, null, null, null, null);
 
         var result = mockMvc.perform(post("/api/v1/incidents")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -110,7 +117,7 @@ class IncidentIntegrationTest {
     @Test
     void create_withManualStartedAt_storesIt() throws Exception {
         var startedAt = OffsetDateTime.parse("2026-10-05T09:30:00Z");
-        var request = new IncidentRequest("DB outage", testApp.getId(), null, false, startedAt, null, null);
+        var request = new IncidentRequest("DB outage", testApp.getId(), null, false, startedAt, null, null, null);
 
         var result = mockMvc.perform(post("/api/v1/incidents")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -127,7 +134,7 @@ class IncidentIntegrationTest {
     @Test
     void create_withCalls_startedAtAutoFromCall() throws Exception {
         var request = new IncidentRequest(
-                "Network issue", testApp.getId(), null, false, null, null, List.of(testCall.getId()));
+                "Network issue", testApp.getId(), null, false, null, null, List.of(testCall.getId()), null);
 
         var result = mockMvc.perform(post("/api/v1/incidents")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -165,7 +172,7 @@ class IncidentIntegrationTest {
     void unlinkLastCall_setsStartedAtToNull() throws Exception {
         // Create with call → startedAt auto-populated
         var request = new IncidentRequest(
-                "Test", testApp.getId(), null, false, null, null, List.of(testCall.getId()));
+                "Test", testApp.getId(), null, false, null, null, List.of(testCall.getId()), null);
         var createResult = mockMvc.perform(post("/api/v1/incidents")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
@@ -189,7 +196,7 @@ class IncidentIntegrationTest {
     void durationSeconds_computedFromStartedAtAndEndedAt() throws Exception {
         var startedAt = OffsetDateTime.parse("2026-10-05T10:00:00Z");
         var endedAt = OffsetDateTime.parse("2026-10-05T11:30:00Z"); // 5400 seconds
-        var request = new IncidentRequest("Test", testApp.getId(), null, false, startedAt, endedAt, null);
+        var request = new IncidentRequest("Test", testApp.getId(), null, false, startedAt, endedAt, null, null);
 
         var result = mockMvc.perform(post("/api/v1/incidents")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -208,7 +215,7 @@ class IncidentIntegrationTest {
 
         // Update with a call
         var updateRequest = new IncidentRequest(
-                "Updated title", testApp.getId(), "desc", false, null, null, List.of(testCall.getId()));
+                "Updated title", testApp.getId(), "desc", false, null, null, List.of(testCall.getId()), null);
         var updateResult = mockMvc.perform(put("/api/v1/incidents/{id}", incidentId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updateRequest))
@@ -241,7 +248,7 @@ class IncidentIntegrationTest {
 
     @Test
     void create_returns400WhenTitleIsBlank() throws Exception {
-        var request = new IncidentRequest("", testApp.getId(), null, false, null, null, null);
+        var request = new IncidentRequest("", testApp.getId(), null, false, null, null, null, null);
 
         mockMvc.perform(post("/api/v1/incidents")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -252,7 +259,7 @@ class IncidentIntegrationTest {
 
     @Test
     void create_returns404WhenApplicationNotFound() throws Exception {
-        var request = new IncidentRequest("Test", UUID.randomUUID(), null, false, null, null, null);
+        var request = new IncidentRequest("Test", UUID.randomUUID(), null, false, null, null, null, null);
 
         mockMvc.perform(post("/api/v1/incidents")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -261,10 +268,47 @@ class IncidentIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void findAll_returnsOnlyIncidentsOfTheRequestedGroup() throws Exception {
+        var groupA = groupRepository.save(OnCallGroup.builder()
+                .name("Group A " + UUID.randomUUID()).build());
+        var groupB = groupRepository.save(OnCallGroup.builder()
+                .name("Group B " + UUID.randomUUID()).build());
+
+        createIncidentInGroup("Incident A", groupA.getId());
+        createIncidentInGroup("Incident B", groupB.getId());
+
+        mockMvc.perform(get("/api/v1/incidents")
+                .param("onCallGroupId", groupA.getId().toString())
+                .with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content", hasSize(1)))
+                .andExpect(jsonPath("$.data.content[0].title").value("Incident A"))
+                .andExpect(jsonPath("$.data.content[0].onCallGroupId").value(groupA.getId().toString()));
+    }
+
+    @Test
+    void findAll_filtersByStartDateRange() throws Exception {
+        var group = groupRepository.save(OnCallGroup.builder()
+                .name("Group D " + UUID.randomUUID()).build());
+
+        createIncidentInGroupWithStart("Inside range", group.getId(), OffsetDateTime.parse("2026-10-05T10:00:00Z"));
+        createIncidentInGroupWithStart("Outside range", group.getId(), OffsetDateTime.parse("2026-07-05T10:00:00Z"));
+
+        mockMvc.perform(get("/api/v1/incidents")
+                .param("onCallGroupId", group.getId().toString())
+                .param("startedFrom", "2026-09-01T00:00:00Z")
+                .param("startedTo", "2026-10-31T23:59:59Z")
+                .with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content", hasSize(1)))
+                .andExpect(jsonPath("$.data.content[0].title").value("Inside range"));
+    }
+
     // ── helpers ──────────────────────────────────
 
     private UUID createIncidentWithoutCalls() throws Exception {
-        var request = new IncidentRequest("Test incident", testApp.getId(), null, false, null, null, null);
+        var request = new IncidentRequest("Test incident", testApp.getId(), null, false, null, null, null, null);
         var result = mockMvc.perform(post("/api/v1/incidents")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
@@ -272,6 +316,25 @@ class IncidentIntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn();
         return parse(result.getResponse().getContentAsString()).data().id();
+    }
+
+    private void createIncidentInGroup(String title, UUID groupId) throws Exception {
+        var request = new IncidentRequest(title, null, null, false, null, null, null, groupId);
+        mockMvc.perform(post("/api/v1/incidents")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+                .with(jwt()))
+                .andExpect(status().isCreated());
+    }
+
+    private void createIncidentInGroupWithStart(String title, UUID groupId, OffsetDateTime startedAt)
+            throws Exception {
+        var request = new IncidentRequest(title, null, null, false, startedAt, null, null, groupId);
+        mockMvc.perform(post("/api/v1/incidents")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+                .with(jwt()))
+                .andExpect(status().isCreated());
     }
 
     private IncidentResponse getIncident(UUID id) throws Exception {

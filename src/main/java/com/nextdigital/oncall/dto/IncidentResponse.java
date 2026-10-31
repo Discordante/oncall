@@ -18,5 +18,7 @@ public record IncidentResponse(
                 @Schema(description = "Duración en segundos (endedAt - startedAt), null si alguna fecha falta") Long durationSeconds,
                 @Schema(description = "Número de llamadas vinculadas") int linkedCallsCount,
                 @Schema(description = "Fecha de creación del registro") OffsetDateTime createdAt,
-                @Schema(description = "Fecha de última actualización") OffsetDateTime updatedAt) {
+                @Schema(description = "Fecha de última actualización") OffsetDateTime updatedAt,
+                @Schema(description = "ID del grupo de guardia al que pertenece la incidencia") UUID onCallGroupId,
+                @Schema(description = "Nombre del grupo de guardia al que pertenece la incidencia") String onCallGroupName) {
 }

@@ -1,5 +1,6 @@
 package com.nextdigital.oncall.controller;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -38,14 +39,18 @@ public class IncidentController {
     private final IncidentService incidentService;
 
     @GetMapping
-    @Operation(summary = "Listar incidencias", description = "Devuelve incidencias paginadas, opcionalmente filtradas por aplicación")
+    @Operation(summary = "Listar incidencias", description = "Devuelve incidencias paginadas, opcionalmente filtradas por aplicación, grupo de guardia y rango de fecha de inicio")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Listado obtenido")
     })
     public ResponseEntity<ApiResponse<Page<IncidentResponse>>> findAll(
             @PageableDefault(size = 20, sort = "createdAt") Pageable pageable,
-            @Parameter(description = "Filtrar por ID de aplicación") @RequestParam(required = false) UUID applicationId) {
-        return ResponseEntity.ok(ApiResponse.success(incidentService.findAll(pageable, applicationId)));
+            @Parameter(description = "Filtrar por ID de aplicación") @RequestParam(required = false) UUID applicationId,
+            @Parameter(description = "Filtrar por ID de grupo de guardia (cada grupo solo ve sus incidencias)") @RequestParam(required = false) UUID onCallGroupId,
+            @Parameter(description = "Fecha de inicio mínima (ISO 8601, inclusive)") @RequestParam(required = false) OffsetDateTime startedFrom,
+            @Parameter(description = "Fecha de inicio máxima (ISO 8601, inclusive)") @RequestParam(required = false) OffsetDateTime startedTo) {
+        return ResponseEntity.ok(ApiResponse.success(
+                incidentService.findAll(pageable, applicationId, onCallGroupId, startedFrom, startedTo)));
     }
 
     @GetMapping("/{id}")
