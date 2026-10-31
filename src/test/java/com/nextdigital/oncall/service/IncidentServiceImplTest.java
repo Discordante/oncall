@@ -3,6 +3,7 @@ package com.nextdigital.oncall.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -21,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 
 import com.nextdigital.oncall.dto.IncidentRequest;
 import com.nextdigital.oncall.entity.Application;
@@ -29,6 +31,7 @@ import com.nextdigital.oncall.entity.ZadarmaCall;
 import com.nextdigital.oncall.exception.ResourceNotFoundException;
 import com.nextdigital.oncall.repository.ApplicationRepository;
 import com.nextdigital.oncall.repository.IncidentRepository;
+import com.nextdigital.oncall.repository.OnCallGroupRepository;
 import com.nextdigital.oncall.repository.ZadarmaCallRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +41,8 @@ class IncidentServiceImplTest {
     IncidentRepository incidentRepository;
     @Mock
     ApplicationRepository applicationRepository;
+    @Mock
+    OnCallGroupRepository groupRepository;
     @Mock
     ZadarmaCallRepository callRepository;
 
@@ -77,7 +82,7 @@ class IncidentServiceImplTest {
 
     @Test
     void create_withNoApplication_isAllowed() {
-        var request = new IncidentRequest("Test incident", null, null, false, null, null, null);
+        var request = new IncidentRequest("Test incident", null, null, false, null, null, null, null);
 
         when(incidentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -91,7 +96,8 @@ class IncidentServiceImplTest {
     @Test
     void create_withNoCalls_usesManualStartedAt() {
         var startedAt = OffsetDateTime.parse("2026-10-05T09:00:00Z");
-        var request = new IncidentRequest("Test incident", application.getId(), null, false, startedAt, null, null);
+        var request = new IncidentRequest("Test incident", application.getId(), null, false, startedAt, null, null,
+                null);
 
         when(applicationRepository.findById(application.getId())).thenReturn(Optional.of(application));
         when(incidentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -104,7 +110,7 @@ class IncidentServiceImplTest {
 
     @Test
     void create_withNoCalls_andNoManualStartedAt_startedAtIsNull() {
-        var request = new IncidentRequest("Test incident", application.getId(), null, false, null, null, null);
+        var request = new IncidentRequest("Test incident", application.getId(), null, false, null, null, null, null);
 
         when(applicationRepository.findById(application.getId())).thenReturn(Optional.of(application));
         when(incidentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -117,7 +123,7 @@ class IncidentServiceImplTest {
     @Test
     void create_withCalls_setsStartedAtFromEarliestCall() {
         var request = new IncidentRequest("Test incident", application.getId(), null, false, null, null,
-                List.of(call1.getId(), call2.getId()));
+                List.of(call1.getId(), call2.getId()), null);
 
         when(applicationRepository.findById(application.getId())).thenReturn(Optional.of(application));
         when(callRepository.findAllById(List.of(call1.getId(), call2.getId())))
@@ -135,7 +141,7 @@ class IncidentServiceImplTest {
     void create_withCalls_ignoresManualStartedAt() {
         var manualDate = OffsetDateTime.parse("2026-10-01T00:00:00Z");
         var request = new IncidentRequest("Test", application.getId(), null, false, manualDate, null,
-                List.of(call1.getId()));
+                List.of(call1.getId()), null);
 
         when(applicationRepository.findById(application.getId())).thenReturn(Optional.of(application));
         when(callRepository.findAllById(List.of(call1.getId()))).thenReturn(List.of(call1));
@@ -194,7 +200,7 @@ class IncidentServiceImplTest {
     @Test
     void durationSeconds_isNullWhenEndedAtMissing() {
         var request = new IncidentRequest("Test", application.getId(), null, false,
-                OffsetDateTime.parse("2026-10-05T10:00:00Z"), null, null);
+                OffsetDateTime.parse("2026-10-05T10:00:00Z"), null, null, null);
 
         when(applicationRepository.findById(application.getId())).thenReturn(Optional.of(application));
         when(incidentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -209,7 +215,7 @@ class IncidentServiceImplTest {
         incident.getCalls().add(call1);
         incident.setStartedAt(call1.getCallStartedAt());
 
-        var request = new IncidentRequest("Updated title", application.getId(), null, false, null, null, null);
+        var request = new IncidentRequest("Updated title", application.getId(), null, false, null, null, null, null);
 
         when(incidentRepository.findById(incident.getId())).thenReturn(Optional.of(incident));
         when(applicationRepository.findById(application.getId())).thenReturn(Optional.of(application));
@@ -226,12 +232,59 @@ class IncidentServiceImplTest {
     @Test
     void findAll_paginates_withApplicationFilter() {
         var pageable = PageRequest.of(0, 10);
-        when(incidentRepository.findByApplicationId(application.getId(), pageable))
+        when(incidentRepository.findAll(any(Specification.class), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of(incident)));
 
-        var result = service.findAll(pageable, application.getId());
+        var result = service.findAll(pageable, application.getId(), null, null, null);
 
         assertThat(result.getContent()).hasSize(1);
+        verify(incidentRepository).findAll(any(Specification.class), eq(pageable));
+    }
+
+    @Test
+    void findAll_passesGroupAndDateRangeFilters() {
+        var pageable = PageRequest.of(0, 10);
+        var groupId = UUID.randomUUID();
+        var from = OffsetDateTime.parse("2026-09-01T00:00:00Z");
+        var to = OffsetDateTime.parse("2026-10-31T23:59:59Z");
+        when(incidentRepository.findAll(any(Specification.class), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of(incident)));
+
+        var result = service.findAll(pageable, null, groupId, from, to);
+
+        assertThat(result.getContent()).hasSize(1);
+        verify(incidentRepository).findAll(any(Specification.class), eq(pageable));
+    }
+
+    @Test
+    void create_withOnCallGroup_assignsGroup() {
+        var group = com.nextdigital.oncall.entity.OnCallGroup.builder()
+                .id(UUID.randomUUID()).name("Guardia test").build();
+        var request = new IncidentRequest("Test", null, null, false, null, null, null, group.getId());
+
+        when(groupRepository.findById(group.getId())).thenReturn(Optional.of(group));
+        when(incidentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        var result = service.create(request);
+
+        assertThat(result.onCallGroupId()).isEqualTo(group.getId());
+        assertThat(result.onCallGroupName()).isEqualTo("Guardia test");
+    }
+
+    @Test
+    void create_infersGroupFromLinkedCalls() {
+        var group = com.nextdigital.oncall.entity.OnCallGroup.builder()
+                .id(UUID.randomUUID()).name("Guardia test").build();
+        call1.setOnCallGroup(group);
+        var request = new IncidentRequest("Test", null, null, false, null, null,
+                List.of(call1.getId()), null);
+
+        when(callRepository.findAllById(List.of(call1.getId()))).thenReturn(List.of(call1));
+        when(incidentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        var result = service.create(request);
+
+        assertThat(result.onCallGroupId()).isEqualTo(group.getId());
     }
 
     @Test
@@ -245,7 +298,7 @@ class IncidentServiceImplTest {
 
     @Test
     void create_throwsWhenApplicationNotFound() {
-        var request = new IncidentRequest("Test", UUID.randomUUID(), null, false, null, null, null);
+        var request = new IncidentRequest("Test", UUID.randomUUID(), null, false, null, null, null, null);
         when(applicationRepository.findById(any())).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.create(request))

@@ -8,6 +8,7 @@ import com.nextdigital.oncall.dto.IncidentRequest;
 import com.nextdigital.oncall.dto.IncidentResponse;
 import com.nextdigital.oncall.entity.Application;
 import com.nextdigital.oncall.entity.Incident;
+import com.nextdigital.oncall.entity.OnCallGroup;
 import com.nextdigital.oncall.entity.ZadarmaCall;
 
 public final class IncidentMapper {
@@ -15,11 +16,13 @@ public final class IncidentMapper {
     private IncidentMapper() {
     }
 
-    public static Incident toEntity(IncidentRequest request, Application application, List<ZadarmaCall> calls) {
+    public static Incident toEntity(IncidentRequest request, Application application, OnCallGroup onCallGroup,
+            List<ZadarmaCall> calls) {
         return Incident.builder()
                 .title(request.title())
                 .description(request.description())
                 .application(application)
+                .onCallGroup(onCallGroup)
                 .bridgeOpened(request.bridgeOpened())
                 .endedAt(request.endedAt())
                 .calls(calls != null ? new HashSet<>(calls) : new HashSet<>())
@@ -29,6 +32,7 @@ public final class IncidentMapper {
 
     public static IncidentResponse toResponse(Incident entity) {
         var app = entity.getApplication();
+        var group = entity.getOnCallGroup();
         return new IncidentResponse(
                 entity.getId(),
                 entity.getTitle(),
@@ -41,14 +45,19 @@ public final class IncidentMapper {
                 computeDurationSeconds(entity),
                 entity.getCalls().size(),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt());
+                entity.getUpdatedAt(),
+                group != null ? group.getId() : null,
+                group != null ? group.getName() : null);
     }
 
     public static void updateEntity(IncidentRequest request, Incident entity, Application application,
-            List<ZadarmaCall> calls) {
+            OnCallGroup onCallGroup, List<ZadarmaCall> calls) {
         entity.setTitle(request.title());
         entity.setDescription(request.description());
         entity.setApplication(application);
+        if (onCallGroup != null) { // null = not provided → keep current owner
+            entity.setOnCallGroup(onCallGroup);
+        }
         entity.setBridgeOpened(request.bridgeOpened());
         entity.setEndedAt(request.endedAt());
         if (calls != null) { // null = callRecordIds was absent → preserve existing

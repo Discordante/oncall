@@ -178,6 +178,7 @@ public class CallSyncServiceImpl implements CallSyncService {
             var incident = Incident.builder()
                     .title(title)
                     .startedAt(call.getCallStartedAt())
+                    .onCallGroup(group)
                     .build();
             incidentRepository.save(incident);
             log.info("Draft incident created for answered call {}", call.getExternalCallId());

@@ -151,7 +151,7 @@ Esto borra la fila en `zadarma_configs` (via `orphanRemoval=true`).
 |---|---|---|
 | `GET` | `/api/v1/zadarma/sips` | Lista todos los SIPs de la cuenta Zadarma, enriquecidos con el nombre del grupo que los usa |
 | `GET` | `/api/v1/zadarma/sip-redirections[?id=...]` | Estado actual de la redirección (destino, condición, etc.) |
-| `GET` | `/api/v1/zadarma/calls-summary[?start=&end=&sip=]` | Estadísticas de llamadas entrantes |
+| `GET` | `/api/v1/zadarma/calls-summary[?start=&end=&sip=]` | Estadísticas de llamadas entrantes, ordenadas de más reciente a más antigua |
 
 ### Clasificación de llamadas de comprobación
 
@@ -169,7 +169,11 @@ Al sincronizar llamadas desde Zadarma (`CallSyncServiceImpl`), se crea una incid
 2. La llamada **no** es de comprobación (`checkCall = false`), es decir, su origen no es el teléfono de una persona de alta, y
 3. El SIP de la llamada pertenece a un grupo de guardia.
 
-La incidencia se crea sin aplicación asignada (el usuario la asigna al editarla) y la llamada no se vincula automáticamente.
+La incidencia se crea sin aplicación asignada (el usuario la asigna al editarla) y la llamada no se vincula automáticamente. La incidencia queda asignada al grupo de guardia de la llamada.
+
+### Aislamiento por grupo
+
+Cada incidencia pertenece a un grupo de guardia (`incidents.on_call_group_id`, migración V15). El endpoint `/api/v1/incidents` acepta los filtros `onCallGroupId`, `applicationId` y el rango de fecha de inicio `startedFrom`/`startedTo` (ISO 8601, ambos inclusive; si la incidencia no tiene `started_at` se usa `created_at`). El panel siempre envía el grupo activo, por lo que cada grupo solo ve sus propias incidencias (también en el modal de asociar llamada a incidencia), y por defecto filtra por el mes anterior y el mes en curso. Al crear una incidencia desde el panel, el `onCallGroupId` se envía en el cuerpo; si no se envía, el servicio lo infiere del grupo de las llamadas vinculadas.
 
 ---
 

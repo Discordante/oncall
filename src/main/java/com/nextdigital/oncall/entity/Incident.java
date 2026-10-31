@@ -34,8 +34,8 @@ import lombok.ToString;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString(exclude = { "application", "calls" })
-@EqualsAndHashCode(exclude = { "application", "calls", "createdAt", "updatedAt" })
+@ToString(exclude = { "application", "calls", "onCallGroup" })
+@EqualsAndHashCode(exclude = { "application", "calls", "onCallGroup", "createdAt", "updatedAt" })
 public class Incident {
 
     @Id
@@ -47,6 +47,11 @@ public class Incident {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    /** Owner group: incidents are scoped per on-call group. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "on_call_group_id")
+    private OnCallGroup onCallGroup;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "application_id")

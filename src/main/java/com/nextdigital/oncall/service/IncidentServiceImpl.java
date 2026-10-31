@@ -15,11 +15,14 @@ import com.nextdigital.oncall.dto.IncidentRequest;
 import com.nextdigital.oncall.dto.IncidentResponse;
 import com.nextdigital.oncall.entity.Application;
 import com.nextdigital.oncall.entity.Incident;
+import com.nextdigital.oncall.entity.OnCallGroup;
 import com.nextdigital.oncall.entity.ZadarmaCall;
 import com.nextdigital.oncall.exception.ResourceNotFoundException;
 import com.nextdigital.oncall.mapper.IncidentMapper;
 import com.nextdigital.oncall.repository.ApplicationRepository;
 import com.nextdigital.oncall.repository.IncidentRepository;
+import com.nextdigital.oncall.repository.IncidentSpecifications;
+import com.nextdigital.oncall.repository.OnCallGroupRepository;
 import com.nextdigital.oncall.repository.ZadarmaCallRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -32,15 +35,15 @@ public class IncidentServiceImpl implements IncidentService {
 
     private final IncidentRepository incidentRepository;
     private final ApplicationRepository applicationRepository;
+    private final OnCallGroupRepository groupRepository;
     private final ZadarmaCallRepository callRepository;
 
     @Override
     @Transactional(readOnly = true)
-    public Page<IncidentResponse> findAll(Pageable pageable, UUID applicationId) {
-        var page = (applicationId != null)
-                ? incidentRepository.findByApplicationId(applicationId, pageable)
-                : incidentRepository.findAll(pageable);
-        return page.map(IncidentMapper::toResponse);
+    public Page<IncidentResponse> findAll(Pageable pageable, UUID applicationId, UUID onCallGroupId,
+            OffsetDateTime startedFrom, OffsetDateTime startedTo) {
+        var spec = IncidentSpecifications.withFilters(applicationId, onCallGroupId, startedFrom, startedTo);
+        return incidentRepository.findAll(spec, pageable).map(IncidentMapper::toResponse);
     }
 
     @Override
@@ -54,7 +57,8 @@ public class IncidentServiceImpl implements IncidentService {
     public IncidentResponse create(IncidentRequest request) {
         var application = resolveApplication(request.applicationId());
         var calls = resolveCalls(request.callRecordIds());
-        var incident = IncidentMapper.toEntity(request, application, calls);
+        var onCallGroup = resolveGroup(request.onCallGroupId(), calls);
+        var incident = IncidentMapper.toEntity(request, application, onCallGroup, calls);
         applyStartedAt(incident, request.startedAt());
         var saved = incidentRepository.save(incident);
         log.info("Incident created: {}", saved.getId());
@@ -67,7 +71,8 @@ public class IncidentServiceImpl implements IncidentService {
         var incident = findEntity(id);
         var application = resolveApplication(request.applicationId());
         var calls = resolveCalls(request.callRecordIds());
-        IncidentMapper.updateEntity(request, incident, application, calls);
+        var onCallGroup = resolveGroup(request.onCallGroupId(), calls);
+        IncidentMapper.updateEntity(request, incident, application, onCallGroup, calls);
         applyStartedAt(incident, request.startedAt());
         var saved = incidentRepository.save(incident);
         log.info("Incident updated: {}", saved.getId());
@@ -89,6 +94,10 @@ public class IncidentServiceImpl implements IncidentService {
         var call = callRepository.findById(callId)
                 .orElseThrow(() -> new ResourceNotFoundException("ZadarmaCall", callId));
         incident.getCalls().add(call);
+        // Adopt the group of the linked call when the incident has none
+        if (incident.getOnCallGroup() == null && call.getOnCallGroup() != null) {
+            incident.setOnCallGroup(call.getOnCallGroup());
+        }
         recalculateStartedAt(incident);
         var saved = incidentRepository.save(incident);
         log.info("Call {} linked to incident {}", callId, incidentId);
@@ -158,6 +167,26 @@ public class IncidentServiceImpl implements IncidentService {
         }
         return applicationRepository.findById(applicationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Application", applicationId));
+    }
+
+    /**
+     * Owner group resolution: the explicit id wins; otherwise it is inferred
+     * from the linked calls so incidents never end up without a group when they
+     * come from a group context.
+     */
+    private OnCallGroup resolveGroup(UUID onCallGroupId, List<ZadarmaCall> calls) {
+        if (onCallGroupId != null) {
+            return groupRepository.findById(onCallGroupId)
+                    .orElseThrow(() -> new ResourceNotFoundException("OnCallGroup", onCallGroupId));
+        }
+        if (calls == null || calls.isEmpty()) {
+            return null;
+        }
+        return calls.stream()
+                .map(ZadarmaCall::getOnCallGroup)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     private List<ZadarmaCall> resolveCalls(List<UUID> callIds) {
