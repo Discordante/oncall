@@ -3,6 +3,7 @@ package com.nextdigital.oncall.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -25,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.nextdigital.oncall.entity.Application;
 import com.nextdigital.oncall.entity.OnCallGroup;
 import com.nextdigital.oncall.entity.ZadarmaCall;
+import com.nextdigital.oncall.exception.ZadarmaApiException;
 
 import com.nextdigital.oncall.repository.IncidentRepository;
 import com.nextdigital.oncall.repository.OnCallGroupRepository;
@@ -101,14 +103,61 @@ class CallSyncServiceImplTest {
     void getCallRecords_alwaysFetchesWhenEndDateIsToday() {
         String todayEnd = LocalDate.now(ZoneId.of("Europe/Madrid"))
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) + " 23:59:59";
-        when(zadarmaReadonlyClient.getStatistics(any(), any(), eq(SIP))).thenReturn(emptyStats());
+        when(syncedDayRepository.countCoveredDays(eq(SIP), any(), any())).thenReturn(Long.MAX_VALUE);
         when(callRepository.findByCallStartedAtBetweenAndSipId(any(), any(), eq(SIP))).thenReturn(List.of());
 
         service.getCallRecords(START, todayEnd, SIP);
 
-        verify(zadarmaReadonlyClient).getStatistics(any(), any(), eq(SIP));
-        // coverage count is skipped — range includes today
-        verify(syncedDayRepository, never()).countCoveredDays(any(), any(), any());
+        verify(zadarmaReadonlyClient, never()).getStatistics(any(), any(), any());
+        verify(syncedDayRepository).countCoveredDays(any(), any(), any());
+    }
+
+    @Test
+    void getCallRecords_servesCachedDataWhenZadarmaSyncFails() {
+        when(syncedDayRepository.countCoveredDays(eq(SIP), any(), any())).thenReturn(0L);
+        when(zadarmaReadonlyClient.getStatistics(START, END, SIP))
+                .thenThrow(new ZadarmaApiException("429 Too Many Requests"));
+
+        var cachedCall = ZadarmaCall.builder()
+                .id(java.util.UUID.randomUUID())
+                .externalCallId("ext-cached")
+                .sipId(SIP)
+                .callStartedAt(OffsetDateTime.parse("2026-09-10T10:00:00Z"))
+                .billSeconds(45)
+                .disposition("answered")
+                .build();
+
+        when(callRepository.findByCallStartedAtBetweenAndSipId(any(), any(), eq(SIP)))
+                .thenReturn(List.of(cachedCall));
+
+        var result = service.getCallRecords(START, END, SIP);
+
+        verify(zadarmaReadonlyClient).getStatistics(START, END, SIP);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).externalCallId()).isEqualTo("ext-cached");
+    }
+
+    @Test
+    void getCallRecords_acceptsIso8601DateRangeFromFrontend() {
+        String isoStart = "2026-10-24T22:00:00.000Z";
+        String isoEnd = "2026-11-29T22:59:59.999Z";
+        lenient().when(syncedDayRepository.countCoveredDays(eq(SIP), any(), any())).thenReturn(0L);
+        lenient().when(zadarmaReadonlyClient.getStatistics(eq(isoStart), eq(isoEnd), eq(SIP))).thenReturn(emptyStats());
+        var storedCall = com.nextdigital.oncall.entity.ZadarmaCall.builder()
+                .id(java.util.UUID.randomUUID())
+                .externalCallId("ext-iso")
+                .sipId(SIP)
+                .callerNumber("34600000001")
+                .callStartedAt(OffsetDateTime.parse("2026-10-25T10:00:00Z"))
+                .billSeconds(60)
+                .disposition("answered")
+                .build();
+        when(callRepository.findByCallStartedAtBetweenAndSipId(any(), any(), eq(SIP))).thenReturn(List.of(storedCall));
+
+        var result = service.getCallRecords(isoStart, isoEnd, SIP);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).externalCallId()).isEqualTo("ext-iso");
     }
 
     @Test

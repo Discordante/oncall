@@ -20,6 +20,7 @@ import com.nextdigital.oncall.entity.Incident;
 import com.nextdigital.oncall.entity.OnCallGroup;
 import com.nextdigital.oncall.entity.ZadarmaCall;
 import com.nextdigital.oncall.entity.ZadarmaSyncedDay;
+import com.nextdigital.oncall.exception.ZadarmaApiException;
 import com.nextdigital.oncall.mapper.ZadarmaCallMapper;
 import com.nextdigital.oncall.repository.IncidentRepository;
 import com.nextdigital.oncall.repository.OnCallGroupRepository;
@@ -59,7 +60,19 @@ public class CallSyncServiceImpl implements CallSyncService {
         if (isCovered(start, end, sip)) {
             log.debug("Cache hit for range [{}, {}] sip={} — serving from DB", start, end, sip);
         } else {
-            fetchAndPersist(start, end, sip);
+            try {
+                fetchAndPersist(start, end, sip);
+            } catch (ZadarmaApiException ex) {
+                // If Zadarma is throttling/failing but we already have local data,
+                // prefer serving cached records instead of surfacing an error.
+                var cachedRecords = queryLocal(start, end, sip);
+                if (!cachedRecords.isEmpty()) {
+                    log.warn("Zadarma sync failed for range [{}, {}] sip={}. Serving {} cached records. Cause: {}",
+                            start, end, sip, cachedRecords.size(), ex.getMessage());
+                    return cachedRecords;
+                }
+                throw ex;
+            }
         }
         return queryLocal(start, end, sip);
     }
@@ -84,11 +97,18 @@ public class CallSyncServiceImpl implements CallSyncService {
         if (startDate == null || endDate == null) {
             return false;
         }
-        if (!endDate.isBefore(LocalDate.now(APP_ZONE))) {
-            return false; // range includes today or future — always refresh
+        LocalDate today = LocalDate.now(APP_ZONE);
+        LocalDate lastFullyPastDay = today.minusDays(1);
+
+        // We only track full-day coverage for past days.
+        LocalDate effectiveEnd = endDate.isBefore(lastFullyPastDay) ? endDate : lastFullyPastDay;
+        if (effectiveEnd.isBefore(startDate)) {
+            // Range is only today/future: serve local snapshot without forcing refresh.
+            return true;
         }
-        long expectedDays = ChronoUnit.DAYS.between(startDate, endDate) + 1;
-        long coveredDays = syncedDayRepository.countCoveredDays(sip, startDate, endDate);
+
+        long expectedDays = ChronoUnit.DAYS.between(startDate, effectiveEnd) + 1;
+        long coveredDays = syncedDayRepository.countCoveredDays(sip, startDate, effectiveEnd);
         return coveredDays >= expectedDays;
     }
 
@@ -260,8 +280,19 @@ public class CallSyncServiceImpl implements CallSyncService {
         if (dateStr == null || dateStr.isBlank()) {
             return null;
         }
+        String trimmed = dateStr.trim();
         try {
-            return LocalDateTime.parse(dateStr, ZADARMA_FMT).toLocalDate();
+            return OffsetDateTime.parse(trimmed).toLocalDate();
+        } catch (Exception ignored) {
+            // fall through to legacy parsing below
+        }
+        try {
+            return LocalDate.parse(trimmed);
+        } catch (Exception ignored) {
+            // fall through to legacy parsing below
+        }
+        try {
+            return LocalDateTime.parse(trimmed, ZADARMA_FMT).toLocalDate();
         } catch (Exception e) {
             log.warn("Could not parse date string: '{}'", dateStr);
             return null;
@@ -272,8 +303,14 @@ public class CallSyncServiceImpl implements CallSyncService {
         if (dateStr == null || dateStr.isBlank()) {
             return null;
         }
+        String trimmed = dateStr.trim();
         try {
-            return LocalDateTime.parse(dateStr, ZADARMA_FMT).atZone(APP_ZONE).toOffsetDateTime();
+            return OffsetDateTime.parse(trimmed);
+        } catch (Exception ignored) {
+            // fall through to legacy parsing below
+        }
+        try {
+            return LocalDateTime.parse(trimmed, ZADARMA_FMT).atZone(APP_ZONE).toOffsetDateTime();
         } catch (Exception e) {
             log.warn("Could not parse datetime string: '{}'", dateStr);
             return null;
