@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.nextdigital.oncall.dto.CallRecordResponse;
+import com.nextdigital.oncall.entity.Application;
 import com.nextdigital.oncall.entity.Incident;
 import com.nextdigital.oncall.entity.OnCallGroup;
 import com.nextdigital.oncall.entity.ZadarmaCall;
@@ -191,17 +192,18 @@ public class CallSyncServiceImpl implements CallSyncService {
         try {
             var title = "Llamada atendida vía SIP %s – %s".formatted(
                     call.getSipId(), call.getCallStartedAt().format(TITLE_FMT));
-            // Application is intentionally left empty: only the user knows which
-            // application is affected and assigns it when editing the incident.
-            // Calls are NOT linked here — avoids FK ordering issue within the same
-            // transaction; the user links them manually.
+            var defaultApplication = resolveDefaultApplication(group);
             var incident = Incident.builder()
                     .title(title)
                     .startedAt(call.getCallStartedAt())
                     .onCallGroup(group)
+                    .application(defaultApplication)
                     .build();
+            incident.getCalls().add(call);
             incidentRepository.save(incident);
-            log.info("Draft incident created for answered call {}", call.getExternalCallId());
+            log.info("Draft incident created for answered call {} with application={} and linkedCall={}",
+                    call.getExternalCallId(), defaultApplication != null ? defaultApplication.getName() : "none",
+                    call.getId());
         } catch (Exception e) {
             log.warn("Could not auto-create draft incident for call {}: {}",
                     call.getExternalCallId(), e.getMessage());
@@ -246,6 +248,13 @@ public class CallSyncServiceImpl implements CallSyncService {
                 .map(CallSyncServiceImpl::normalizePhone)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
+    }
+
+    private Application resolveDefaultApplication(OnCallGroup group) {
+        if (group == null || group.getApplications() == null || group.getApplications().size() != 1) {
+            return null;
+        }
+        return group.getApplications().stream().findFirst().orElse(null);
     }
 
     private static boolean isCheckCall(ZadarmaCall call, Set<String> checkNumbers) {
