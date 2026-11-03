@@ -19,6 +19,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -245,6 +246,40 @@ class CallSyncServiceImplTest {
                 service.getCallRecords(START, END, SIP);
 
                 verify(incidentRepository).save(any());
+        }
+
+        @Test
+        void answeredCall_withSingleGroupApplication_setsApplicationByDefault() {
+                when(syncedDayRepository.countCoveredDays(eq(SIP), any(), any())).thenReturn(0L);
+                when(zadarmaReadonlyClient.getStatistics(START, END, SIP)).thenReturn(statsWithOneRecord());
+                when(callRepository.existsByExternalCallId("ext-1")).thenReturn(false);
+
+                var app = Application.builder().id(java.util.UUID.randomUUID()).name("Only App").build();
+                var group = OnCallGroup.builder()
+                                .id(java.util.UUID.randomUUID())
+                                .name("Guardia test")
+                                .applications(new HashSet<>(java.util.Set.of(app)))
+                                .build();
+                when(groupRepository.findByZadarmaConfigSipId(SIP)).thenReturn(Optional.of(group));
+
+                var savedCall = ZadarmaCall.builder()
+                                .id(java.util.UUID.randomUUID())
+                                .externalCallId("ext-1").sipId(SIP)
+                                .callStartedAt(OffsetDateTime.parse("2026-09-05T10:00:00Z"))
+                                .billSeconds(60).disposition("answered")
+                                .build();
+                when(callRepository.save(any())).thenReturn(savedCall);
+                when(incidentRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+                when(callRepository.findByCallStartedAtBetweenAndSipId(any(), any(), eq(SIP))).thenReturn(List.of());
+
+                service.getCallRecords(START, END, SIP);
+
+                var captor = ArgumentCaptor.forClass(com.nextdigital.oncall.entity.Incident.class);
+                verify(incidentRepository).save(captor.capture());
+                assertThat(captor.getValue().getApplication()).isNotNull();
+                assertThat(captor.getValue().getApplication().getId()).isEqualTo(app.getId());
+                assertThat(captor.getValue().getCalls()).hasSize(1);
+                assertThat(captor.getValue().getCalls()).extracting("id").contains(savedCall.getId());
         }
 
         @Test
