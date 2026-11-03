@@ -1,6 +1,8 @@
 package com.nextdigital.oncall.config;
 
 import java.io.IOException;
+import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -105,7 +107,7 @@ public class SecurityConfig {
         @Bean
         public CorsConfigurationSource corsConfigurationSource() {
                 CorsConfiguration config = new CorsConfiguration();
-                config.setAllowedOrigins(List.of(frontendUrl));
+                config.setAllowedOrigins(resolveAllowedOrigins(frontendUrl));
                 config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
                 config.setAllowedHeaders(List.of("*"));
                 config.setAllowCredentials(true);
@@ -113,6 +115,33 @@ public class SecurityConfig {
                 UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
                 source.registerCorsConfiguration("/**", config);
                 return source;
+        }
+
+        private List<String> resolveAllowedOrigins(String configuredFrontendUrl) {
+                List<String> origins = new ArrayList<>();
+                origins.add(configuredFrontendUrl);
+
+                try {
+                        URI uri = URI.create(configuredFrontendUrl);
+                        String host = uri.getHost();
+                        if (host == null) {
+                                return origins;
+                        }
+
+                        String scheme = uri.getScheme() == null ? "http" : uri.getScheme();
+                        int port = uri.getPort();
+                        String portPart = port > 0 ? ":" + port : "";
+
+                        if ("localhost".equalsIgnoreCase(host)) {
+                                origins.add(scheme + "://127.0.0.1" + portPart);
+                        } else if ("127.0.0.1".equals(host)) {
+                                origins.add(scheme + "://localhost" + portPart);
+                        }
+                } catch (IllegalArgumentException ignored) {
+                        return origins;
+                }
+
+                return origins;
         }
 
         private void writeError(HttpServletResponse response, HttpStatus status, String code, String message)
